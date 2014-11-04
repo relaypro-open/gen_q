@@ -1,0 +1,12 @@
+#!/bin/bash
+APP=gen_q
+APP_HOME=/Users/jstimpson/dev/erlang/$APP
+cp $APP_HOME/$APP-local.config $APP_HOME/$APP.config
+APP_DATA=$APP_HOME/.$APP
+mkdir -p $APP_DATA
+OPT_HOME=$APP_HOME \
+    OPT_DB_DIR=$APP_DATA/db \
+    OPT_LOG_DIR=$APP_DATA/log \
+    OPT_PID_DIR=$APP_DATA/run \
+    OPT_USER=jstimpson \
+    $APP_HOME/$APP.sh $1
