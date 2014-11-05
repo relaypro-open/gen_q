@@ -22,7 +22,7 @@ clean:
 
 subdirs: ensure-deps c_src/c.o
 	cd deps/pmod_transform && make && cd ../..
-	@(./rebar -vvv compile)
+	@(./rebar compile)
 
 ensure-deps:
 	@(./rebar get-deps)

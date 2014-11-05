@@ -1,12 +1,26 @@
 -module(gen_q_port).
 
+-export([hopen/5, apply/4, hclose/2]).
+
 -export([start/0, start_link/0, stop/1, init/0, call_port/2]).
 
 -export([test/0]).
 
 -define(SharedLib, "gen_q_drv").
+-define(FuncQHOpen, 1).
+-define(FuncQHClose, 2).
+-define(FuncQApply, 3).
 
 -include("../include/gen_q.hrl").
+
+hopen(Pid, Host, Port, UserPass, Timeout) ->
+    call_port(Pid, {?FuncQHOpen, [Host, Port, UserPass, Timeout]}).
+
+apply(Pid, Handle, Types, Values) ->
+    call_port(Pid, {?FuncQApply, [Handle, Types, Values]}).
+
+hclose(Pid, Handle) ->
+    call_port(Pid, {?FuncQHClose, [Handle]}).
 
 test() ->
     {ok, Q1} = gen_q_port:start(),

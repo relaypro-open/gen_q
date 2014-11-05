@@ -30,8 +30,8 @@ int q_hopen(char *host, int port, char *unpw, int timeout, ei_x_buff *buff) {
         return ei_x_encode_error_tuple_atom(buff, "conn_failed");
     }
 
-    EI_X_ENC(ei_x_encode_ok_tuple_header(buff));
-    EI_X_ENC(ei_x_encode_long(buff, h));
+    EI(ei_x_encode_ok_tuple_header(buff));
+    EI(ei_x_encode_long(buff, h));
     return 0;
 }
 

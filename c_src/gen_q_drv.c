@@ -2,19 +2,26 @@
 #include "erl_driver.h"
 #include "ei.h"
 #include "gen_q_work.h"
+#include "gen_q_log.h"
+#include "k.h"
 
 typedef struct {
     ErlDrvPort port;
 } GenQData;
 
 static ErlDrvData gen_q_drv_start(ErlDrvPort port, char* buff) {
+    open_log();
     GenQData* d = (GenQData*)driver_alloc(sizeof(GenQData));
     d->port = port;
+    khp("",-1);
+    LOG("port started %d\n", 0);
     return (ErlDrvData)d;
 }
 
 static void gen_q_drv_stop(ErlDrvData handle) {
     driver_free((char*)handle);
+    LOG("port stopped %d\n", 0);
+    close_log();
 }
 
 static void gen_q_drv_output(ErlDrvData handle, char *buff,
@@ -26,14 +33,13 @@ static void gen_q_drv_output(ErlDrvData handle, char *buff,
             genq_free_work);
 }
 
-static void ready_async(ErlDrvData handle, ErlDrvThreadData async) {
+static void ready_async(ErlDrvData handle, ErlDrvThreadData work) {
     GenQData* d = (GenQData*)handle;
-
-    ei_x_buff x;
-    ei_x_new_with_version(&x);
-    ei_x_encode_long(&x, 1);
-    driver_output(d->port, x.buff, x.index);
-    ei_x_free(&x);
+    ei_x_buff result;
+    ei_x_new(&result);
+    genq_work_result((QWork*)work, &result);
+    driver_output(d->port, result.buff, result.index);
+    ei_x_free(&result);
 }
 
 ErlDrvEntry gen_q_drv_entry = {
