@@ -2,11 +2,9 @@
 #define EI_UTIL_H
 #include "ei.h"
 
-#define OK ei_x_encode_ok(buff)
-
-#define EI(call) \
-    do { \
-        if(call < 0) { return -1; } \
+#define EI(call)                      \
+    do {                              \
+        if((call) < 0) { return -1; } \
     } while(0)
 
 extern int ei_x_encode_ok(ei_x_buff *buff);

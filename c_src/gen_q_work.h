@@ -25,19 +25,40 @@ typedef struct {
 
     // output
     int handle;
+    int errorlen;
+    char* error;
 } QWorkHOpen;
 
 typedef struct {
+    // input
     long handle;
+
+    // output
+    int errorlen;
+    char* error;
 } QWorkHClose;
 
 typedef struct {
 } QWorkApply;
 
-extern void genq_work(void *work);
+/**
+ * ALLOC
+ */
 extern void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen);
-extern void genq_free_work(void *work);
 
+/**
+ * DO WORK
+ */
+extern void genq_work(void *work);
+
+/**
+ * RESULT
+ */
 extern int genq_work_result(void *work, ei_x_buff *buff);
+
+/**
+ * FREE
+ */
+extern void genq_free_work(void *work);
 
 #endif
