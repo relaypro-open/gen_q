@@ -1,10 +1,23 @@
 #ifndef EI_UTIL_H
 #define EI_UTIL_H
 #include "ei.h"
+#include "gen_q_log.h"
 
 #define EI(call)                      \
     do {                              \
-        if((call) < 0) { return -1; } \
+        if((call) < 0) {              \
+            LOG("call to EI func failed %d\n", 0); \
+            return -1;                \
+        }                             \
+    } while(0)
+
+#define EIC(call, cleanup)            \
+    do {                              \
+        if((call) < 0) {              \
+            (cleanup);                \
+            LOG("call to EI func failed %d\n", 0); \
+            return -1;                \
+        }                             \
     } while(0)
 
 extern int ei_x_encode_ok(ei_x_buff *buff);

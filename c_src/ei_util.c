@@ -56,12 +56,16 @@ int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
         return 0;
     } else if(type == ERL_LIST_EXT) {
         // String larger than 65535
+        int arity = 0;
+        EI(ei_decode_list_header(buff, index, &arity));
         *str = malloc((sizeof(char))*(*len+1));
         int i;
         for(i=0; i < *len; ++i) {
             EI(ei_decode_char(buff, index, &(*str)[i]));
         }
         (*str)[*len] = '\0';
+        EI(ei_skip_term(buff, index)); // skip tail
+
         return 0;
     } else {
         return -1;

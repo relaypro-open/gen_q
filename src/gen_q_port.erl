@@ -1,10 +1,10 @@
 -module(gen_q_port).
 
--export([hopen/5, apply/4, hclose/2]).
+-export([hopen/5, apply/5, hclose/2]).
 
 -export([start/0, start_link/0, stop/1, init/0, call_port/2]).
 
--export([test/0]).
+-export([test_async/0, test_apply/1]).
 
 -define(SharedLib, "gen_q_drv").
 -define(FuncQHOpen, 1).
@@ -16,13 +16,13 @@
 hopen(Pid, Host, Port, UserPass, Timeout) ->
     call_port(Pid, {?FuncQHOpen, [Host, Port, UserPass, Timeout]}).
 
-apply(Pid, Handle, Types, Values) ->
-    call_port(Pid, {?FuncQApply, [Handle, Types, Values]}).
+apply(Pid, Handle, Func, Types, Values) ->
+    call_port(Pid, {?FuncQApply, [Handle, Func, {Types, Values}]}).
 
 hclose(Pid, Handle) ->
     call_port(Pid, {?FuncQHClose, [Handle]}).
 
-test() ->
+test_async() ->
     {ok, Q1} = gen_q_port:start(),
     {ok, Q2} = gen_q_port:start(),
     Tick = now(),
@@ -36,6 +36,14 @@ test() ->
                 io:format("done 2 ~p, ~p~n", [R2, timer:now_diff(now(), Tick)]),
                 stop(Q2)
         end).
+
+test_apply(Func) ->
+    {ok, P} = start(),
+    {ok, H} = hopen(P, "localhost", 5000, "us:pa", 1000),
+    R = apply(P, H, Func, string, "Test"),
+    ok = hclose(P, H),
+    stop(P),
+    R.
 
 call_port(Pid, Msg) ->
     Pid ! {call, self(), Msg},

@@ -33,11 +33,16 @@ static void gen_q_drv_output(ErlDrvData handle, char *buff,
             genq_free_work);
 }
 
-static void ready_async(ErlDrvData handle, ErlDrvThreadData work) {
+static void ready_async(ErlDrvData handle, ErlDrvThreadData w) {
     GenQData* d = (GenQData*)handle;
+    QWork* work = (QWork*)w;
+
     ei_x_buff result;
     ei_x_new(&result);
-    genq_work_result((QWork*)work, &result);
+
+    genq_work_result(work, &result);
+    genq_free_work(work);
+
     driver_output(d->port, result.buff, result.index);
     ei_x_free(&result);
 }

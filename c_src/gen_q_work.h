@@ -39,6 +39,20 @@ typedef struct {
 } QWorkHClose;
 
 typedef struct {
+    // input
+    long handle;
+    int funclen;
+    char* func;
+    int bufflen;
+    char* buff;
+    int types_index;
+    int values_index;
+
+    // output
+    int errorlen;
+    char* error;
+    int has_x;
+    ei_x_buff x;
 } QWorkApply;
 
 /**

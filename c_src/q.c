@@ -3,8 +3,13 @@
 #include "k.h"
 #include <string.h>
 #include "ei_util.h"
+#include "e2q.h"
+#include "q2e.h"
 
-#define HANDLE_K_ERRNO                                                \
+int ei_x_encode_apply_result(QWorkApply* data, K r);
+
+#define HANDLE_K_ERRNO(cleanup)                                       \
+    LOG("checking errno %d\n", 0);                                    \
     if(errno) {                                                       \
         char ebuf[256];                                               \
         if(0!=strerror_r(errno, ebuf, 256)) {                         \
@@ -16,7 +21,23 @@
             data->errorlen = elen;                                    \
             (data->error)[elen] = '\0';                               \
         }                                                             \
+        cleanup;                                                      \
+        return;                                                       \
     }
+
+#define HANDLE_ERROR(errstr, errlen) \
+    do { \
+        data->errorlen = errlen; \
+        data->error = malloc((sizeof(char))*(data->errorlen+1)); \
+        memcpy(data->error, errstr, data->errorlen); \
+        data->error[data->errorlen] = '\0'; \
+    } while(0)
+
+/* Decrements the ref count of object r if r is non-NULL */
+void kx_guarded_decr_ref(K r) {
+    if(r)
+        r0(r);
+}
 
 void q_hopen(QWorkHOpen* data) {
 
@@ -24,7 +45,7 @@ void q_hopen(QWorkHOpen* data) {
 
     errno = 0;
     data->handle = khpun(data->host, data->port, data->userpass, data->timeout);
-    HANDLE_K_ERRNO;
+    HANDLE_K_ERRNO(/* No cleanup */);
 
     LOG("khpun result %d\n", data->handle);
 }
@@ -34,8 +55,53 @@ void q_hclose(QWorkHClose* data) {
 
     errno = 0;
     kclose(data->handle);
-    HANDLE_K_ERRNO;
+    HANDLE_K_ERRNO(/* No cleanup */);
 }
 
 void q_apply(QWorkApply* data) {
+    LOG("kapply %d\n", 0);
+    int index = 0;
+    K kdata = e2q(data->buff, &index, data->types_index, data->values_index);
+    if(!kdata) {
+        HANDLE_ERROR("e2q", 3);
+        LOG("kapply null kdata - %s\n", "e2q");
+        return;
+    }
+
+    // -------------
+    // handle kdata
+    LOG("kapply calling value with list size %lld\n", kdata->n);
+    errno = 0;
+    K r = k(data->handle, data->func, kdata, (K)0);
+    LOG("kapply received result with type %d\n", r->t);
+
+    HANDLE_K_ERRNO(/* No cleanup */);
+
+    if(r->t == -128) {
+        // q error
+        LOG("kapply received q error %s\n", r->s);
+        HANDLE_ERROR(r->s, strlen(r->s));
+
+        r0(r);
+        return;
+    }
+
+    int encode_result = ei_x_encode_apply_result(data, r);
+
+    r0(r);
+
+    if(encode_result < 0) {
+        HANDLE_ERROR("eix", 3);
+        LOG("kapply encode error - %s\n", "eix");
+        return;
+    }
+    LOG("kapply encode success %d\n", 0);
+}
+
+int ei_x_encode_apply_result(QWorkApply* data, K r) {
+    EI(ei_x_new(&data->x));
+    data->has_x = 1;
+    //EI(ei_x_encode_atom(&data->x, "ok"));
+    EI(ei_x_encode_k(&data->x, r));
+    return 0;
 }
