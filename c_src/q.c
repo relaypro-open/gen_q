@@ -58,10 +58,16 @@ void q_hclose(QWorkHClose* data) {
     HANDLE_K_ERRNO(/* No cleanup */);
 }
 
-void q_apply(QWorkApply* data) {
+void q_apply(QWorkApply* data, QOpts* opts) {
     LOG("kapply %d\n", 0);
-    int index = 0;
-    K kdata = e2q(data->buff, &index, data->types_index, data->values_index);
+
+    K kdata;
+    int ei_res = ei_decode_k(data->buff, &data->types_index, &data->values_index, &kdata);
+    if(ei_res < 1) {
+        HANDLE_ERROR("ei_decode_k", 11);
+        LOG("kapply ei error - %s\n", "ei_decode_k");
+        return;
+    }
     if(!kdata) {
         HANDLE_ERROR("e2q", 3);
         LOG("kapply null kdata - %s\n", "e2q");

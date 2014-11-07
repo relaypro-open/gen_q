@@ -4,14 +4,21 @@
 #include "erl_driver.h"
 #include "ei.h"
 
+#define FUNC_OPTS 0
 #define FUNC_Q_H_OPEN 1
 #define FUNC_Q_H_CLOSE 2
 #define FUNC_Q_APPLY 3
 
 typedef struct {
+    int unix_timestamp_is_q_datetime;
+    int day_seconds_is_q_time;
+} QOpts;
+
+typedef struct {
     int version;
     long op;
     void* data;
+    QOpts* opts;
 } QWork;
 
 typedef struct {
@@ -54,6 +61,8 @@ typedef struct {
     int has_x;
     ei_x_buff x;
 } QWorkApply;
+
+extern void copy_qopts(QOpts* src, QOpts* dest);
 
 /**
  * ALLOC

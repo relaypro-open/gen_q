@@ -7,6 +7,8 @@
 -export([test_async/0, test_apply/1]).
 
 -define(SharedLib, "gen_q_drv").
+
+-define(FuncInitPort, 0).
 -define(FuncQHOpen, 1).
 -define(FuncQHClose, 2).
 -define(FuncQApply, 3).
@@ -92,6 +94,11 @@ load_driver() ->
 
 init() ->
     Port = open_port({spawn, ?SharedLib}, [binary]),
+    send_async_port_command(Port, {?FuncInitPort, []}),
+    receive
+        {Port, {data, ok}} ->
+            ok
+    end,
     loop(Port).
 
 loop(Port) ->

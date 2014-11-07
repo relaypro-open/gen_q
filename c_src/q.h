@@ -5,6 +5,6 @@
 
 extern void q_hopen(QWorkHOpen* data);
 extern void q_hclose(QWorkHClose* data);
-extern void q_apply(QWorkApply* data);
+extern void q_apply(QWorkApply* data, QOpts* opts);
 
 #endif

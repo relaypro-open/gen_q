@@ -11,6 +11,7 @@
 
 /* ALLOC internal function declarations */
 int decode_op(char *buff, int* index, QWork *work);
+int decode_op_opts(char *buff, int *index, QWork *work);
 int decode_op_hopen(char *buff, int *index, QWork *work);
 int decode_op_hclose(char *buff, int *index, QWork *work);
 int decode_op_apply(char *buff, int *index, QWork *work);
@@ -18,7 +19,7 @@ int decode_op_apply(char *buff, int *index, QWork *work);
 /* DO WORK internal function declarations */
 void work_hopen(QWorkHOpen* data);
 void work_hclose(QWorkHClose* data);
-void work_apply(QWorkApply* data);
+void work_apply(QWorkApply* data, QOpts* opts);
 
 /* RESULT internal function declarations */
 int work_result_hopen(QWorkHOpen* data, ei_x_buff *buff);
@@ -26,6 +27,7 @@ int work_result_hclose(QWorkHClose* data, ei_x_buff *buff);
 int work_result_apply(QWorkApply* data, ei_x_buff *buff);
 
 /* FREE internal function declarations */
+void free_qopts(QOpts* data);
 void free_qwork_data(int op, void *data);
 void free_qwork_hopen(QWorkHOpen *data);
 void free_qwork_hclose(QWorkHClose *data);
@@ -42,12 +44,18 @@ void free_qwork_apply(QWorkApply *data);
         return 0;                                   \
     }
 
+void copy_qopts(QOpts* src, QOpts* dest) {
+    dest->unix_timestamp_is_q_datetime = src->unix_timestamp_is_q_datetime;
+    dest->day_seconds_is_q_time = src->day_seconds_is_q_time;
+}
+
 /**
  * ALLOC
  */
 void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
     QWork *work = malloc(sizeof(QWork));
     work->op = -1;
+    work->opts = 0;
 
     int index = 0;
     ei_decode_version(buff, &index, &work->version);
@@ -74,6 +82,8 @@ void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
 
 int decode_op(char *buff, int* index, QWork *work) {
     switch(work->op) {
+        case FUNC_OPTS:
+            return decode_op_opts(buff, index, work);
         case FUNC_Q_H_OPEN:
             return decode_op_hopen(buff, index, work);
         case FUNC_Q_H_CLOSE:
@@ -82,6 +92,14 @@ int decode_op(char *buff, int* index, QWork *work) {
             return decode_op_apply(buff, index, work);
     }
     return -1;
+}
+
+int decode_op_opts(char* buff, int* index, QWork* work) {
+    QOpts* data = malloc(sizeof(QOpts));
+    data->unix_timestamp_is_q_datetime = 1; // TODO
+    data->day_seconds_is_q_time = 1; // TODO
+    work->data = data;
+    return 0;
 }
 
 int decode_op_hopen(char *buff, int* index, QWork* work) {
@@ -205,6 +223,9 @@ int decode_op_apply(char *buff, int* index, QWork* work) {
 void genq_work(void *w) {
     QWork *work = (QWork*)w;
     switch(work->op) {
+        case FUNC_OPTS:
+            // no op
+            break;
         case FUNC_Q_H_OPEN:
             work_hopen((QWorkHOpen*)work->data);
             break;
@@ -212,7 +233,7 @@ void genq_work(void *w) {
             work_hclose((QWorkHClose*)work->data);
             break;
         case FUNC_Q_APPLY:
-            work_apply((QWorkApply*)work->data);
+            work_apply((QWorkApply*)work->data, work->opts);
             break;
     }
 }
@@ -225,8 +246,8 @@ void work_hclose(QWorkHClose *data) {
     q_hclose(data);
 }
 
-void work_apply(QWorkApply* data) {
-    q_apply(data);
+void work_apply(QWorkApply* data, QOpts* opts) {
+    q_apply(data, opts);
 }
 
 /**
@@ -235,6 +256,9 @@ void work_apply(QWorkApply* data) {
 int genq_work_result(void *w, ei_x_buff *buff) {
     QWork *work = (QWork*)w;
     switch(work->op) {
+        case FUNC_OPTS:
+            // no op
+            return 0;
         case FUNC_Q_H_OPEN:
             return work_result_hopen((QWorkHOpen*)work->data, buff);
         case FUNC_Q_H_CLOSE:
@@ -293,6 +317,10 @@ void genq_free_work(void *w) {
 
 void free_qwork_data(int op, void *data) {
     switch(op) {
+        case FUNC_OPTS:
+            LOG("free qwork port init %d\n", 0);
+            free_qopts((QOpts*)data);
+            break;
         case FUNC_Q_H_OPEN:
             LOG("free qwork hopen %d\n", 0);
             free_qwork_hopen((QWorkHOpen*)data);
@@ -306,6 +334,10 @@ void free_qwork_data(int op, void *data) {
             free_qwork_apply((QWorkApply*)data);
             break;
     }
+}
+
+void free_qopts(QOpts* data) {
+    free(data);
 }
 
 void free_qwork_hopen(QWorkHOpen *data) {

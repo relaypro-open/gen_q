@@ -4,9 +4,11 @@
 #include "gen_q_work.h"
 #include "gen_q_log.h"
 #include "k.h"
+#include "ei_util.h"
 
 typedef struct {
     ErlDrvPort port;
+    QOpts opts;
 } GenQData;
 
 static ErlDrvData gen_q_drv_start(ErlDrvPort port, char* buff) {
@@ -27,9 +29,22 @@ static void gen_q_drv_stop(ErlDrvData handle) {
 static void gen_q_drv_output(ErlDrvData handle, char *buff,
         ErlDrvSizeT bufflen) {
     GenQData *d = (GenQData*)handle;
+
+    QWork* work = genq_malloc_work(buff, bufflen);
+    if(work->op == FUNC_OPTS) {
+        copy_qopts((QOpts*)work->data, &d->opts);
+
+        ei_x_buff ok;
+        ei_x_encode_ok(&ok);
+        driver_output(d->port, ok.buff, ok.index);
+        ei_x_free(&ok);
+        genq_free_work(work);
+        return;
+    }
+    work->opts = &d->opts;
     driver_async(d->port, NULL,
             genq_work,
-            genq_malloc_work(buff, bufflen),
+            work,
             genq_free_work);
 }
 

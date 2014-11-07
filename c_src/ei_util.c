@@ -52,7 +52,7 @@ int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
     if(type == ERL_STRING_EXT) {
         *str = malloc((sizeof(char))*(*len+1));
         (*str)[*len] = '\0';
-        EI(ei_decode_string(buff, index, *str));
+        EIC(ei_decode_string(buff, index, *str), free(str));
         return 0;
     } else if(type == ERL_LIST_EXT) {
         // String larger than 65535
@@ -61,11 +61,21 @@ int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
         *str = malloc((sizeof(char))*(*len+1));
         int i;
         for(i=0; i < *len; ++i) {
-            EI(ei_decode_char(buff, index, &(*str)[i]));
+            EIC(ei_decode_char(buff, index, &(*str)[i]), free(str));
         }
         (*str)[*len] = '\0';
-        EI(ei_skip_term(buff, index)); // skip tail
+        EIC(ei_skip_term(buff, index), free(str)); // skip tail
 
+        return 0;
+    } else if(type == ERL_ATOM_EXT) {
+        *str = malloc(sizeof(char)*(*len+1));
+        (*str)[*len] = '\0';
+        EIC(ei_decode_atom(buff, index, *str), free(str));
+        return 0;
+    } else if(type == ERL_BINARY_EXT) {
+        *str = malloc(sizeof(char)*(*len+1));
+        (*str)[*len] = '\0';
+        EIC(ei_decode_binary(buff, index, *str, len), free(str));
         return 0;
     } else {
         return -1;
