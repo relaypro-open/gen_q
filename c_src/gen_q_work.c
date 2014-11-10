@@ -94,10 +94,43 @@ int decode_op(char *buff, int* index, QWork *work) {
     return -1;
 }
 
+#define ASSIGN_PROPERTY(key, prop)   \
+    do {                             \
+        if(0==strcmp(#key,prop)) { \
+            data->key = 1;           \
+        }                            \
+    } while(0)
+
 int decode_op_opts(char* buff, int* index, QWork* work) {
     QOpts* data = malloc(sizeof(QOpts));
-    data->unix_timestamp_is_q_datetime = 1; // TODO
-    data->day_seconds_is_q_time = 1; // TODO
+
+    // init defaults
+    data->unix_timestamp_is_q_datetime = 0;
+    data->day_seconds_is_q_time = 0;
+
+    int arity = 0;
+    EI(ei_decode_list_header(buff, index, &arity));
+    LOG("decode op opts arity %d\n", arity);
+    int i;
+    for(i=0; i<arity; ++i) {
+        char* property = 0;
+        int propertylen = 0;
+        EI(ei_decode_alloc_string(buff, index, &property, &propertylen));
+
+        LOG("decode op opts - found property %s\n", property);
+
+        // not the most elegant solution. to be revisited
+        ASSIGN_PROPERTY(unix_timestamp_is_q_datetime, property);
+        ASSIGN_PROPERTY(day_seconds_is_q_time, property);
+
+        free(property);
+    }
+    if(arity > 0) {
+        EI(ei_skip_term(buff, index)); // skip tail
+    }
+
+    LOG("decode op opts utiqd=%d, dsiqt=%d\n", data->unix_timestamp_is_q_datetime, data->day_seconds_is_q_time);
+
     work->data = data;
     return 0;
 }
@@ -126,7 +159,10 @@ int decode_op_hopen(char *buff, int* index, QWork* work) {
     LOG("decode op hopen userpass %s\n", data->userpass);
     EI(ei_decode_long(buff, index, &data->timeout));
     LOG("decode op hopen timeout %ld\n", data->timeout);
-    EI(ei_skip_term(buff, index)); // skip tail
+
+    if(arity > 0) {
+        EI(ei_skip_term(buff, index)); // skip tail
+    }
 
     // outputs
     data->handle = -1;
@@ -159,7 +195,9 @@ int decode_op_hclose(char *buff, int* index, QWork* work) {
     } else if(type == ERL_LIST_EXT) {
         EI(ei_decode_list_header(buff, index, &arity));
         EI(ei_decode_long(buff, index, &data->handle));
-        EI(ei_skip_term(buff, index)); // skip tail
+        if(arity > 0) {
+            EI(ei_skip_term(buff, index)); // skip tail
+        }
     } else {
         return -1;
     }
@@ -208,7 +246,10 @@ int decode_op_apply(char *buff, int* index, QWork* work) {
     memcpy(data->buff, buff+types_index, data->bufflen);
     data->types_index = 0;
     data->values_index = data->types_index + (values_index - types_index);
-    EI(ei_skip_term(buff, index)); // skip tail
+
+    if(arity > 0) {
+        EI(ei_skip_term(buff, index)); // skip tail
+    }
 
     // outputs
     data->error = NULL;
@@ -318,7 +359,7 @@ void genq_free_work(void *w) {
 void free_qwork_data(int op, void *data) {
     switch(op) {
         case FUNC_OPTS:
-            LOG("free qwork port init %d\n", 0);
+            LOG("free qwork opts %d\n", 0);
             free_qopts((QOpts*)data);
             break;
         case FUNC_Q_H_OPEN:

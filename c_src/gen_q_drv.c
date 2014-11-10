@@ -15,6 +15,9 @@ static ErlDrvData gen_q_drv_start(ErlDrvPort port, char* buff) {
     open_log();
     GenQData* d = (GenQData*)driver_alloc(sizeof(GenQData));
     d->port = port;
+    d->opts.unix_timestamp_is_q_datetime = 0;
+    d->opts.day_seconds_is_q_time = 0;
+
     khp("",-1);
     LOG("port started %d\n", 0);
     return (ErlDrvData)d;
@@ -32,13 +35,16 @@ static void gen_q_drv_output(ErlDrvData handle, char *buff,
 
     QWork* work = genq_malloc_work(buff, bufflen);
     if(work->op == FUNC_OPTS) {
+        LOG("received opts %ld\n", work->op);
         copy_qopts((QOpts*)work->data, &d->opts);
+        genq_free_work(work);
 
+        LOG("responding %s\n", "ok");
         ei_x_buff ok;
+        ei_x_new(&ok);
         ei_x_encode_ok(&ok);
         driver_output(d->port, ok.buff, ok.index);
         ei_x_free(&ok);
-        genq_free_work(work);
         return;
     }
     work->opts = &d->opts;

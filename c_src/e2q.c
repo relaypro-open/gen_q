@@ -381,8 +381,10 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
                     safe_deref_list(*k, 0, list_index, vsize));
             kK(*k)[list_index] = k_elem;
         }
-        EIC(ei_skip_term(b, ti), r0(*k)); // skip tail
-        EIC(ei_skip_term(b, vi), r0(*k)); // skip tail
+        if(tsize > 0) {
+            EIC(ei_skip_term(b, ti), r0(*k)); // skip tail
+            EIC(ei_skip_term(b, vi), r0(*k)); // skip tail
+        }
         return 0;
     }
     return -1;
@@ -403,7 +405,9 @@ int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts) {
         EIC(ei_decode_and_assign(b, i, ktype, k, list_index, opts),
                 safe_deref_list(*k, 0, list_index, arity));
     }
-    EIC(ei_skip_term(b, i), r0(*k)); // skip tail
+    if(arity > 0) {
+        EIC(ei_skip_term(b, i), r0(*k)); // skip tail
+    }
     return 0;
 }
 
@@ -511,7 +515,9 @@ int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts) {
     for(list_index=0; list_index < nvcols; ++list_index) {
         EIC(ei_decode_and_assign(b, vi, KS, &r_cols, list_index, opts), r0(r_cols));
     }
-    EIC(ei_skip_term(b, vi), r0(r_cols)); // skip tail
+    if(nvcols > 0) {
+        EIC(ei_skip_term(b, vi), r0(r_cols)); // skip tail
+    }
 
     //         ti                         vi
     //         |                          |
@@ -528,7 +534,9 @@ int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts) {
                 safe_deref_list2(r_cols, KS, 0, 0, r_vals, 0, list_index, nvcols));
         kK(r_vals)[list_index] = column;
     }
-    EIC(ei_skip_term(b, vi), r02(r_cols, r_vals)); // skip tail
+    if(nvcols > 0) {
+        EIC(ei_skip_term(b, vi), r02(r_cols, r_vals)); // skip tail
+    }
 
     *k = xT(xD(r_cols, r_vals));
     return 0;

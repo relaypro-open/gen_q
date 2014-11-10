@@ -64,7 +64,9 @@ int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
             EIC(ei_decode_char(buff, index, &(*str)[i]), free(str));
         }
         (*str)[*len] = '\0';
-        EIC(ei_skip_term(buff, index), free(str)); // skip tail
+        if(arity > 0) {
+            EIC(ei_skip_term(buff, index), free(str)); // skip tail
+        }
 
         return 0;
     } else if(type == ERL_ATOM_EXT) {
@@ -75,7 +77,8 @@ int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
     } else if(type == ERL_BINARY_EXT) {
         *str = malloc(sizeof(char)*(*len+1));
         (*str)[*len] = '\0';
-        EIC(ei_decode_binary(buff, index, *str, len), free(str));
+        long llen = 0;
+        EIC(ei_decode_binary(buff, index, *str, &llen), free(str));
         return 0;
     } else {
         return -1;

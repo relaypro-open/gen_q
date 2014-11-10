@@ -2,13 +2,13 @@
 
 -export([hopen/5, apply/5, hclose/2]).
 
--export([start/0, start_link/0, stop/1, init/0, call_port/2]).
+-export([start/1, start_link/1, stop/1, init/1, call_port/2]).
 
 -export([test_async/0, test_apply/1]).
 
 -define(SharedLib, "gen_q_drv").
 
--define(FuncInitPort, 0).
+-define(FuncOpts, 0).
 -define(FuncQHOpen, 1).
 -define(FuncQHClose, 2).
 -define(FuncQApply, 3).
@@ -25,8 +25,9 @@ hclose(Pid, Handle) ->
     call_port(Pid, {?FuncQHClose, [Handle]}).
 
 test_async() ->
-    {ok, Q1} = gen_q_port:start(),
-    {ok, Q2} = gen_q_port:start(),
+    Opts = [unix_timestamp_is_q_datetime, day_seconds_is_q_time],
+    {ok, Q1} = gen_q_port:start(Opts),
+    {ok, Q2} = gen_q_port:start(Opts),
     Tick = now(),
     spawn(fun() ->
                 R1 = gen_q_port:call_port(Q1, 2000),
@@ -40,7 +41,8 @@ test_async() ->
         end).
 
 test_apply(Func) ->
-    {ok, P} = start(),
+    Opts = [unix_timestamp_is_q_datetime, day_seconds_is_q_time],
+    {ok, P} = start(Opts),
     {ok, H} = hopen(P, "localhost", 5000, "us:pa", 1000),
     R = apply(P, H, Func, string, "Test"),
     ok = hclose(P, H),
@@ -54,10 +56,10 @@ call_port(Pid, Msg) ->
             Result
     end.
 
-start() ->
+start(Opts) ->
     case load_driver() of
         ok ->
-            case spawn(?MODULE, init, []) of
+            case spawn(?MODULE, init, [Opts]) of
                 {error, Error} ->
                     {error, Error};
                 Pid ->
@@ -67,10 +69,10 @@ start() ->
             {error, Error}
     end.
 
-start_link() ->
+start_link(Opts) ->
     case load_driver() of
         ok ->
-            case spawn_link(?MODULE, init, []) of
+            case spawn_link(?MODULE, init, [Opts]) of
                 {error, Error} ->
                     {error, Error};
                 Pid ->
@@ -92,9 +94,9 @@ load_driver() ->
             exit({error, erl_ddll:format_error(Error)})
     end.
 
-init() ->
+init(Opts) ->
     Port = open_port({spawn, ?SharedLib}, [binary]),
-    send_async_port_command(Port, {?FuncInitPort, []}),
+    send_async_port_command(Port, {?FuncOpts, Opts}),
     receive
         {Port, {data, ok}} ->
             ok
