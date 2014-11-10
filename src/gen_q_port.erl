@@ -1,6 +1,6 @@
 -module(gen_q_port).
 
--export([hopen/5, apply/5, hclose/2]).
+-export([hopen/5, apply/5, hclose/2, hkill/2]).
 
 -export([start/1, start_link/1, stop/1, init/1, call_port/2]).
 
@@ -12,6 +12,7 @@
 -define(FuncQHOpen, 1).
 -define(FuncQHClose, 2).
 -define(FuncQApply, 3).
+-define(FuncQHKill, 4).
 
 -include("../include/gen_q.hrl").
 
@@ -23,6 +24,9 @@ apply(Pid, Handle, Func, Types, Values) ->
 
 hclose(Pid, Handle) ->
     call_port(Pid, {?FuncQHClose, [Handle]}).
+
+hkill(Pid, Handle) ->
+    call_port(Pid, {?FuncQHKill, [Handle]}).
 
 test_async() ->
     Opts = [unix_timestamp_is_q_datetime, day_seconds_is_q_time],

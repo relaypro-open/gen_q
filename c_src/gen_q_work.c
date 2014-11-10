@@ -15,16 +15,19 @@ int decode_op_opts(char *buff, int *index, QWork *work);
 int decode_op_hopen(char *buff, int *index, QWork *work);
 int decode_op_hclose(char *buff, int *index, QWork *work);
 int decode_op_apply(char *buff, int *index, QWork *work);
+int decode_op_hkill(char *buff, int *index, QWork *work);
 
 /* DO WORK internal function declarations */
 void work_hopen(QWorkHOpen* data);
 void work_hclose(QWorkHClose* data);
 void work_apply(QWorkApply* data, QOpts* opts);
+void work_hkill(QWorkHKill* data);
 
 /* RESULT internal function declarations */
 int work_result_hopen(QWorkHOpen* data, ei_x_buff *buff);
 int work_result_hclose(QWorkHClose* data, ei_x_buff *buff);
 int work_result_apply(QWorkApply* data, ei_x_buff *buff);
+int work_result_hkill(QWorkHKill* data, ei_x_buff *buff);
 
 /* FREE internal function declarations */
 void free_qopts(QOpts* data);
@@ -32,6 +35,7 @@ void free_qwork_data(int op, void *data);
 void free_qwork_hopen(QWorkHOpen *data);
 void free_qwork_hclose(QWorkHClose *data);
 void free_qwork_apply(QWorkApply *data);
+void free_qwork_hkill(QWorkHKill* data);
 
 #define HANDLE_DATA_ERROR                           \
     if(data == NULL) {                              \
@@ -90,6 +94,8 @@ int decode_op(char *buff, int* index, QWork *work) {
             return decode_op_hclose(buff, index, work);
         case FUNC_Q_APPLY:
             return decode_op_apply(buff, index, work);
+        case FUNC_Q_H_KILL:
+            return decode_op_hkill(buff, index, work);
     }
     return -1;
 }
@@ -188,6 +194,8 @@ int decode_op_hclose(char *buff, int* index, QWork* work) {
     }
 
     // inputs
+    //
+    // a list of a single int comes in as a string usually
     if(type == ERL_STRING_EXT) {
         char argstr[HCLOSE_ARGV+1];
         EI(ei_decode_string(buff, index, argstr));
@@ -258,6 +266,45 @@ int decode_op_apply(char *buff, int* index, QWork* work) {
     return 0;
 }
 
+int decode_op_hkill(char *buff, int* index, QWork* work) {
+    QWorkHKill* data = malloc(sizeof(QWorkHKill));
+
+    // init flags for safe frees
+    data->errorlen = -1;
+
+    static const int HKILL_ARGV = 1;
+    int arity = 0;
+    int type = 0;
+    EI(ei_get_type(buff, index, &type, &arity));
+    LOG("decode op hclose arity %d\n", arity);
+    if(arity != HKILL_ARGV) {
+        return -1;
+    }
+
+    // inputs
+    if(type == ERL_STRING_EXT) {
+        char argstr[HKILL_ARGV+1];
+        EI(ei_decode_string(buff, index, argstr));
+        data->handle = argstr[0];
+    } else if(type == ERL_LIST_EXT) {
+        EI(ei_decode_list_header(buff, index, &arity));
+        EI(ei_decode_long(buff, index, &data->handle));
+        if(arity > 0) {
+            EI(ei_skip_term(buff, index)); // skip tail
+        }
+    } else {
+        return -1;
+    }
+
+    LOG("decode op hkill handle %ld\n", data->handle);
+
+    // outputs
+    data->error = NULL;
+
+    work->data = data;
+    return 0;
+}
+
 /**
  * DO WORK
  */
@@ -276,6 +323,9 @@ void genq_work(void *w) {
         case FUNC_Q_APPLY:
             work_apply((QWorkApply*)work->data, work->opts);
             break;
+        case FUNC_Q_H_KILL:
+            work_hkill((QWorkHKill*)work->data);
+            break;
     }
 }
 
@@ -289,6 +339,10 @@ void work_hclose(QWorkHClose *data) {
 
 void work_apply(QWorkApply* data, QOpts* opts) {
     q_apply(data, opts);
+}
+
+void work_hkill(QWorkHKill* data) {
+    q_hkill(data);
 }
 
 /**
@@ -306,6 +360,8 @@ int genq_work_result(void *w, ei_x_buff *buff) {
             return work_result_hclose((QWorkHClose*)work->data, buff);
         case FUNC_Q_APPLY:
             return work_result_apply((QWorkApply*)work->data, buff);
+        case FUNC_Q_H_KILL:
+            return work_result_hkill((QWorkHKill*)work->data, buff);
     }
     return -1;
 }
@@ -346,6 +402,13 @@ int work_result_apply(QWorkApply* data, ei_x_buff *buff) {
     return 0;
 }
 
+int work_result_hkill(QWorkHKill* data, ei_x_buff* buff) {
+    LOG("work result hkill %d\n", 0);
+    HANDLE_DATA_ERROR;
+    EI(ei_x_encode_ok(buff));
+    return 0;
+}
+
 /**
  * FREE
  */
@@ -373,6 +436,10 @@ void free_qwork_data(int op, void *data) {
         case FUNC_Q_APPLY:
             LOG("free qwork apply %d\n", 0);
             free_qwork_apply((QWorkApply*)data);
+            break;
+        case FUNC_Q_H_KILL:
+            LOG("free qwork hkill %d\n", 0);
+            free_qwork_hkill((QWorkHKill*)data);
             break;
     }
 }
@@ -420,6 +487,14 @@ void free_qwork_apply(QWorkApply *data) {
     }
     if(data->errorlen >= 0) {
         LOG("free qwork apply - errorlen %d\n", data->errorlen);
+        free(data->error);
+    }
+    free(data);
+}
+
+void free_qwork_hkill(QWorkHKill* data) {
+    if(data->errorlen >= 0) {
+        LOG("free qwork hkill - errorlen %d\n", data->errorlen);
         free(data->error);
     }
     free(data);

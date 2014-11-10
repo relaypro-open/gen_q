@@ -8,6 +8,7 @@
 #define FUNC_Q_H_OPEN 1
 #define FUNC_Q_H_CLOSE 2
 #define FUNC_Q_APPLY 3
+#define FUNC_Q_H_KILL 4
 
 typedef struct {
     int unix_timestamp_is_q_datetime;
@@ -44,6 +45,15 @@ typedef struct {
     int errorlen;
     char* error;
 } QWorkHClose;
+
+typedef struct {
+    // input
+    long handle;
+
+    // output
+    int errorlen;
+    char* error;
+} QWorkHKill;
 
 typedef struct {
     // input

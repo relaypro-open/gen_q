@@ -111,3 +111,11 @@ int ei_x_encode_apply_result(QWorkApply* data, K r) {
     EI(ei_x_encode_k(&data->x, r));
     return 0;
 }
+
+ void q_hkill(QWorkHKill* data) {
+    LOG("killing %ld\n", data->handle);
+
+    errno = 0;
+    k((I)data->handle, (const S)"\\\\", (K)0);
+    HANDLE_K_ERRNO(/* No cleanup */);
+ }
