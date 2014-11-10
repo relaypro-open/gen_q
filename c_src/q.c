@@ -62,8 +62,8 @@ void q_apply(QWorkApply* data, QOpts* opts) {
     LOG("kapply %d\n", 0);
 
     K kdata;
-    int ei_res = ei_decode_k(data->buff, &data->types_index, &data->values_index, &kdata);
-    if(ei_res < 1) {
+    int ei_res = ei_decode_k(data->buff, &data->types_index, &data->values_index, &kdata, opts);
+    if(ei_res < 0) {
         HANDLE_ERROR("ei_decode_k", 11);
         LOG("kapply ei error - %s\n", "ei_decode_k");
         return;
@@ -76,7 +76,7 @@ void q_apply(QWorkApply* data, QOpts* opts) {
 
     // -------------
     // handle kdata
-    LOG("kapply calling value with list size %lld\n", kdata->n);
+    LOG("kapply calling %s with list size %lld\n", data->func, kdata->n);
     errno = 0;
     K r = k(data->handle, data->func, kdata, (K)0);
     LOG("kapply received result with type %d\n", r->t);

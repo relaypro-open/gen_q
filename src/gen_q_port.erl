@@ -98,8 +98,8 @@ init(Opts) ->
     Port = open_port({spawn, ?SharedLib}, [binary]),
     send_async_port_command(Port, {?FuncOpts, Opts}),
     receive
-        {Port, {data, ok}} ->
-            ok
+        {Port, {data, Data}} ->
+            ok = binary_to_term(Data)
     end,
     loop(Port).
 
