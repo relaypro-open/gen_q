@@ -44,7 +44,7 @@ test_apply(Func) ->
     Opts = [unix_timestamp_is_q_datetime, day_seconds_is_q_time],
     {ok, P} = start(Opts),
     {ok, H} = hopen(P, "localhost", 5000, "us:pa", 1000),
-    R = apply(P, H, Func, string, "Test"),
+    R = apply(P, H, Func, integer, 1),
     ok = hclose(P, H),
     stop(P),
     R.
@@ -83,7 +83,8 @@ start_link(Opts) ->
     end.
 
 stop(Pid) ->
-    Pid ! stop.
+    Pid ! stop,
+    ok.
 
 load_driver() ->
     Dir = gen_q:priv_dir(),

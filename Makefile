@@ -56,3 +56,5 @@ install: build dirs
 	@(rm -f /opt/$(app)/.erlang.cookie)
 	@(cp /home/jstimpson/.erlang.cookie /opt/$(app)/.erlang.cookie)
 
+test: all
+	@(./rebar eunit skip_deps=true)
