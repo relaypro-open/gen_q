@@ -14,7 +14,7 @@ gen_q_port_test_() ->
             end}.
 
 setup() ->
-    {ok, Q} = test_q:start(500),
+    {ok, Q} = test_q:start(),
     {ok, P} = gen_q_port:start([]),
     {ok, H} = gen_q_port:hopen(P, "localhost", 5000, "us:pa", 1000),
     #ctx{qpid=Q, port=P, h=H}.
