@@ -39,37 +39,43 @@ gen_q_port_test_() ->
                      ?_eqe_all_neighbor({list, real}, [1.1, 2.2, 3.3], ?realEps),
                      ?_eqe_all_neighbor({list, real}, [5.5, 6.5, 7.5], ?floatEps),
 
-                    % Test erlang encoding lists of small ints as strings:
-                    ?_eqe({list, time}, [1,2,3]),
-                    ?_eqe({list, second}, [1,2,3]),
-                    ?_eqe({list, minute}, [1,2,3]),
-                    ?_eqe({list, date}, [1,2,3]),
-                    ?_eqe({list, month}, [1,2,3]),
-                    ?_eqe({list, timespan}, [1,2,3]),
-                    ?_eqe({list, timestamp}, [1,2,3]),
-                    ?_eqe({list, byte}, [1,2,3]),
-                    ?_eqe({list, boolean}, [1,2,3]),
-                    ?_eqe({list, short}, [1,2,3]),
-                    ?_eqe_all_neighbor({list, datetime}, [1,2,3], ?floatEps),
-                    ?_eqe_all_neighbor({list, float}, [1,2,3], ?floatEps),
-                    ?_eqe_all_neighbor({list, real}, [1,2,3], ?realEps),
-                    ?_eqe({list, integer}, [1,2,3]),
-                    ?_eqe({list, long}, [1,2,3]),
+                     % Test erlang encoding lists of small ints as strings:
+                     ?_eqe({list, time}, [1,2,3]),
+                     ?_eqe({list, second}, [1,2,3]),
+                     ?_eqe({list, minute}, [1,2,3]),
+                     ?_eqe({list, date}, [1,2,3]),
+                     ?_eqe({list, month}, [1,2,3]),
+                     ?_eqe({list, timespan}, [1,2,3]),
+                     ?_eqe({list, timestamp}, [1,2,3]),
+                     ?_eqe({list, byte}, [1,2,3]),
+                     ?_eqe({list, boolean}, [1,2,3]),
+                     ?_eqe({list, short}, [1,2,3]),
+                     ?_eqe_all_neighbor({list, datetime}, [1,2,3], ?floatEps),
+                     ?_eqe_all_neighbor({list, float}, [1,2,3], ?floatEps),
+                     ?_eqe_all_neighbor({list, real}, [1,2,3], ?realEps),
+                     ?_eqe({list, integer}, [1,2,3]),
+                     ?_eqe({list, long}, [1,2,3]),
 
-                    % Test erlang encoding lists of big ints (>255) as lists:
-                    ?_eqe({list, time}, [1000,2000,3000]),
-                    ?_eqe({list, second}, [1000,2000,3000]),
-                    ?_eqe({list, minute}, [1000,2000,3000]),
-                    ?_eqe({list, date}, [1000,2000,3000]),
-                    ?_eqe({list, month}, [1000,2000,3000]),
-                    ?_eqe({list, timespan}, [1000,2000,3000]),
-                    ?_eqe({list, timestamp}, [1000,2000,3000]),
-                    ?_eqe({list, short}, [1000,2000,3000]),
-                    ?_eqe_all_neighbor({list, datetime}, [1000,2000,3000], ?floatEps),
-                    ?_eqe_all_neighbor({list, float}, [1000,2000,3000], ?floatEps),
-                    ?_eqe_all_neighbor({list, real}, [1000,2000,3000], ?realEps),
-                    ?_eqe({list, integer}, [1000,2000,3000]),
-                    ?_eqe({list, long}, [1000,2000,3000])
+                     % Test erlang encoding lists of big ints (>255) as lists:
+                     ?_eqe({list, time}, [1000,2000,3000]),
+                     ?_eqe({list, second}, [1000,2000,3000]),
+                     ?_eqe({list, minute}, [1000,2000,3000]),
+                     ?_eqe({list, date}, [1000,2000,3000]),
+                     ?_eqe({list, month}, [1000,2000,3000]),
+                     ?_eqe({list, timespan}, [1000,2000,3000]),
+                     ?_eqe({list, timestamp}, [1000,2000,3000]),
+                     ?_eqe({list, short}, [1000,2000,3000]),
+                     ?_eqe_all_neighbor({list, datetime}, [1000,2000,3000], ?floatEps),
+                     ?_eqe_all_neighbor({list, float}, [1000,2000,3000], ?floatEps),
+                     ?_eqe_all_neighbor({list, real}, [1000,2000,3000], ?realEps),
+                     ?_eqe({list, integer}, [1000,2000,3000]),
+                     ?_eqe({list, long}, [1000,2000,3000]),
+
+                     % Mixed lists
+                     ?_eqe_type({list, [integer, integer]}, {list, integer}, [1,2]),
+                     ?_eqe({list, [integer, long]}, [1, 2]),
+                     ?_eqe({list, [integer, long]}, [1, 2000]),
+                     ?_eqe({list, [string, timestamp]}, ["test", 1236128361])
                  ]
             end}.
 

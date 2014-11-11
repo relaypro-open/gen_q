@@ -51,7 +51,6 @@ int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
     EI(ei_get_type(buff, index, &type, len));
     if(type == ERL_STRING_EXT) {
         *str = malloc((sizeof(char))*(*len+1));
-        (*str)[*len] = '\0';
         EIC(ei_decode_string(buff, index, *str), free(str));
         return 0;
     } else if(type == ERL_LIST_EXT) {

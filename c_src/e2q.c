@@ -30,7 +30,7 @@
 
 // types
 int get_type_identifier_from_string(const char* str, int* type);
-int ei_get_k_type(char* buff, int* ti, int* vi, int* type, int* size);
+int ei_get_k_type(char* buff, int* ti, int* type, int* size);
 int ei_get_k_type_from_atom(char* buff, int* ti, int atom_size, int* type);
 
 // decoders
@@ -50,6 +50,8 @@ int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts);
 int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts* opts);
 int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts);
 int ei_decode_dict(char* b, int* ti, int* vi, K* k, QOpts* opts);
+int ei_assign_from_string(K* k, int ktype, int arity, char* v, QOpts* opts);
+int ei_assign_index_from_string(K* k, int ktype, int kindex, char* v, int vindex, QOpts* opts);
 
 // helpers
 int is_exact_atom(char* atom, const char* compare);
@@ -57,11 +59,12 @@ int is_infinity(char* atom);
 int is_null(char* atom);
 void r02(K k1, K k2);
 void safe_deref_list(K k, int ktype, int j, int n);
+void safe_deref_list_and_free(K k, int ktype, int j, int n, void* f);
 void safe_deref_list2(K k1, int ktype1, int j1, int n1, K k2, int ktype2, int j2, int n2);
 double unix_timestamp_to_datetime(long long u);
 int sec_to_msec(int sec);
 
-int ei_get_k_type(char* buff, int* ti, int* vi, int* type, int* size) {
+int ei_get_k_type(char* buff, int* ti, int* type, int* size) {
     int ttype = 0; // erlang type of ktype element
     int tsize = 0; // erlang size of ktype element
     EI(ei_get_type(buff, ti, &ttype, &tsize));
@@ -93,7 +96,7 @@ int ei_get_k_type_from_atom(char* buff, int* ti, int atom_size, int* type) {
     char* atom = malloc(sizeof(char)*(atom_size+1));
     atom[atom_size] = '\0';
     EIC(ei_decode_atom(buff, ti, atom), free(atom));
-    EIC(get_type_identifier_from_string(atom, type), free(atom));;
+    EIC(get_type_identifier_from_string(atom, type), free(atom));
     free(atom);
     return 0;
 }
@@ -168,7 +171,7 @@ int ei_decode_types_values_tuple(char *buff, int *index, int *types_index, int *
 int ei_decode_k(char *buff, int* types_index, int* values_index, K* k, QOpts* opts) {
     int ktype = 0;
     int esize = 0;
-    EI(ei_get_k_type(buff, types_index, values_index, &ktype, &esize));
+    EI(ei_get_k_type(buff, types_index, &ktype, &esize));
     switch(ktype) {
 
        case -KT: // time
@@ -394,30 +397,157 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
     if(ttype == ERL_ATOM_EXT) {
         int ktype = 0;
         int esize = 0;
-        EI(ei_get_k_type(b, ti, vi, &ktype, &esize));
+        EI(ei_get_k_type(b, ti, &ktype, &esize));
         EI(ei_decode_same_list(b, vi, ktype, k, opts));
         return 0;
     } else if(ttype == ERL_LIST_EXT) {
+        int vtype = 0;
         int vsize = 0;
-        EI(ei_decode_list_header(b, ti, &tsize));
-        EI(ei_decode_list_header(b, vi, &vsize));
-        if(tsize != vsize) {
-            return -1;
+        EI(ei_get_type(b, vi, &vtype, &vsize));
+        if(vtype == ERL_STRING_EXT) {
+            LOG("mixed list decoded as erlang string %d\n", 0);
+            EI(ei_decode_list_header(b, ti, &tsize));
+            if(tsize != vsize) {
+                return -1;
+            }
+
+            char* s = malloc(sizeof(char)*(vsize+1));
+            EIC(ei_decode_string(b, vi, s), free(s));
+
+            *k = ktn(0, vsize);
+            int list_index;
+            for(list_index=0; list_index < vsize; ++list_index) {
+                int ktype = 0;
+                int ktypesize = 0;
+                EIC(ei_get_k_type(b, ti, &ktype, &ktypesize), free(s));
+                EIC(ei_assign_index_from_string(k, ktype, list_index, s, list_index, opts),
+                        safe_deref_list_and_free(*k, 0, list_index, vsize, s));
+            }
+
+            free(s);
+            return 0;
+
+        } else if (vtype == ERL_LIST_EXT) {
+            EI(ei_decode_list_header(b, ti, &tsize));
+            EI(ei_decode_list_header(b, vi, &vsize));
+            if(tsize != vsize) {
+                return -1;
+            }
+            *k = ktn(0, vsize);
+            int list_index;
+            for(list_index=0; list_index<vsize; ++list_index) {
+                K k_elem = 0;
+                EIC(ei_decode_k(b, ti, vi, &k_elem, opts),
+                        safe_deref_list(*k, 0, list_index, vsize));
+                kK(*k)[list_index] = k_elem;
+            }
+            if(tsize > 0) {
+                EIC(ei_skip_term(b, ti), r0(*k)); // skip tail
+                EIC(ei_skip_term(b, vi), r0(*k)); // skip tail
+            }
+            return 0;
         }
-        int list_index;
-        for(list_index=0; list_index<vsize; ++list_index) {
-            K k_elem = 0;
-            EIC(ei_decode_k(b, ti, vi, &k_elem, opts),
-                    safe_deref_list(*k, 0, list_index, vsize));
-            kK(*k)[list_index] = k_elem;
-        }
-        if(tsize > 0) {
-            EIC(ei_skip_term(b, ti), r0(*k)); // skip tail
-            EIC(ei_skip_term(b, vi), r0(*k)); // skip tail
-        }
-        return 0;
     }
     return -1;
+}
+
+int ei_assign_from_string(K* k, int ktype, int arity, char* v, QOpts* opts) {
+    *k = ktn(-ktype, arity);
+    int list_index;
+    if(ktype == -KT && opts->day_seconds_is_q_time) {
+        for(list_index=0; list_index < arity; ++list_index) {
+            kI(*k)[list_index] = sec_to_msec(v[list_index]);
+        }
+    } else if(ktype == -KZ && opts->unix_timestamp_is_q_datetime) {
+        for(list_index=0; list_index < arity; ++list_index) {
+            kF(*k)[list_index] = unix_timestamp_to_datetime(v[list_index]);
+        }
+    } else {
+        for(list_index=0; list_index < arity; ++list_index) {
+            switch(ktype) {
+                case -KT:
+                case -KV:
+                case -KU:
+                case -KI:
+                case -KD:
+                case -KM:
+                    kI(*k)[list_index] = v[list_index];
+                    break;
+                case -KN:
+                case -KP:
+                case -KJ:
+                    kJ(*k)[list_index] = v[list_index];
+                    break;
+                case -KG:
+                case -KB:
+                    kG(*k)[list_index] = v[list_index];
+                    break;
+                case -KH:
+                    kH(*k)[list_index] = v[list_index];
+                    break;
+                case -KC:
+                    kC(*k)[list_index] = v[list_index];
+                    break;
+                case -KF:
+                case -KZ:
+                    kF(*k)[list_index] = v[list_index];
+                    break;
+                case -KE:
+                    kE(*k)[list_index] = v[list_index];
+                    break;
+                default:
+                    return -1;
+            }
+        }
+    }
+    return 0;
+}
+
+int ei_assign_index_from_string(K* k, int ktype, int kindex, char* v, int vindex, QOpts* opts) {
+    if(ktype == -KT && opts->day_seconds_is_q_time) {
+        kK(*k)[kindex] = ki(sec_to_msec(v[vindex]));
+        kK(*k)[kindex]->t = -KT;
+    } else if(ktype == -KZ && opts->unix_timestamp_is_q_datetime) {
+        kK(*k)[kindex] = kj(unix_timestamp_to_datetime(v[vindex]));
+        kK(*k)[kindex]->t = -KZ;
+    } else {
+        switch(ktype) {
+            case -KT:
+            case -KV:
+            case -KU:
+            case -KI:
+            case -KD:
+            case -KM:
+                kK(*k)[kindex] = ki(v[vindex]);
+                break;
+            case -KN:
+            case -KP:
+            case -KJ:
+                kK(*k)[kindex] = kj(v[vindex]);
+                break;
+            case -KG:
+            case -KB:
+                kK(*k)[kindex] = kg(v[vindex]);
+                break;
+            case -KH:
+                kK(*k)[kindex] = kh(v[vindex]);
+                break;
+            case -KC:
+                kK(*k)[kindex] = kc(v[vindex]);
+                break;
+            case -KF:
+            case -KZ:
+                kK(*k)[kindex] = kf(v[vindex]);
+                break;
+            case -KE:
+                kK(*k)[kindex] = ke(v[vindex]);
+                break;
+            default:
+                return -1;
+        }
+        kK(*k)[kindex]->t = ktype;
+    }
+    return 0;
 }
 
 int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts) {
@@ -427,58 +557,9 @@ int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts) {
     if(type == ERL_STRING_EXT) {
         // erlang encodes some lists of integers as strings
 
-        char* v = malloc(sizeof(char)*arity);
+        char* v = malloc(sizeof(char)*(arity+1));
         EIC(ei_decode_string(b, i, v), free(v));
-
-        *k = ktn(-ktype, arity);
-        int list_index;
-        if(ktype == -KT && opts->day_seconds_is_q_time) {
-            for(list_index=0; list_index < arity; ++list_index) {
-                kI(*k)[list_index] = sec_to_msec(v[list_index]);
-            }
-        } else if(ktype == -KZ && opts->unix_timestamp_is_q_datetime) {
-            for(list_index=0; list_index < arity; ++list_index) {
-                kF(*k)[list_index] = unix_timestamp_to_datetime(v[list_index]);
-            }
-        } else {
-            for(list_index=0; list_index < arity; ++list_index) {
-                switch(ktype) {
-                    case -KT:
-                    case -KV:
-                    case -KU:
-                    case -KI:
-                    case -KD:
-                    case -KM:
-                        kI(*k)[list_index] = v[list_index];
-                        break;
-                    case -KN:
-                    case -KP:
-                    case -KJ:
-                        kJ(*k)[list_index] = v[list_index];
-                        break;
-                    case -KG:
-                    case -KB:
-                        kG(*k)[list_index] = v[list_index];
-                        break;
-                    case -KH:
-                        kH(*k)[list_index] = v[list_index];
-                        break;
-                    case -KC:
-                        kC(*k)[list_index] = v[list_index];
-                        break;
-                    case -KF:
-                    case -KZ:
-                        kF(*k)[list_index] = v[list_index];
-                        break;
-                    case -KE:
-                        kE(*k)[list_index] = v[list_index];
-                        break;
-                    default:
-                        free(v);
-                        return -1;
-                }
-            }
-        }
+        EIC(ei_assign_from_string(k, ktype, arity, v, opts), free(v));
         free(v);
 
     } else {
@@ -676,6 +757,11 @@ int is_null(char* atom) {
 int is_exact_atom(char* atom, const char* compare) {
     int result = 0==strcmp(atom,compare);
     return result;
+}
+
+void safe_deref_list_and_free(K k, int ktype, int j, int n, void* f) {
+    safe_deref_list(k, ktype, j, n);
+    free(f);
 }
 
 void safe_deref_list(K k, int ktype, int j, int n) {
