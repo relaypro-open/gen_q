@@ -100,7 +100,18 @@ gen_q_port_test_() ->
 
                      % Dicts
                      ?_eqe({dict, {list, integer}, {list, integer}}, {[1,2,3], [4,5,6]}),
-                     ?_eqe({dict, {list, symbol}, {list, string}}, {[a,b,c], ["string4","string5","string6"]})
+                     ?_eqe({dict, {list, symbol}, {list, string}}, {[a,b,c], ["string4","string5","string6"]}),
+
+                     % Keyed table
+                     ?_eqe({dict, {table, {list, [{list, symbol}]}},
+                                  {table, {list, [{list, long},{list,long}]}}},
+                              {{[c],[[a,b,c]]},{[a,b],[[1,2,3],[4,5,6]]}}),
+
+                     % Function definition and execution
+                     ?_assertMatch(ok, gen_q_port:eval(P, H, "gen_q_port_monad:{`long$x*2}")),
+                     ?_assertMatch({ok,{long,10}}, gen_q_port:apply(P, H, gen_q_port_monad, long, 5)),
+                     ?_assertMatch(ok, gen_q_port:eval(P, H, "gen_q_port_diad:{`long$x*y}")),
+                     ?_assertMatch({ok,{long,56}}, gen_q_port:dot(P, H, gen_q_port_diad, {list, long}, [8, 7]))
                  ]
             end}.
 

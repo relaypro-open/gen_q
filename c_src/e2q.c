@@ -122,6 +122,8 @@ int get_type_identifier_from_string(const char* str, int *type) {
         *type = XD;
     } else if(STR_EQUAL("ok",str)) {
         *type = 101;
+    } else if(STR_EQUAL("undefined",str)) {
+        *type = 101;
     } else if(STR_EQUAL("boolean",str)) {
         *type = -KB;
     } else if(STR_EQUAL("float",str)) {
@@ -275,6 +277,9 @@ int ei_decode_k(char *buff, int* types_index, int* values_index, K* k, QOpts* op
            break;
        case XD:  // dict/keyed table
            EI(ei_decode_dict(buff, types_index, values_index, k, opts));
+           break;
+       case 101: // (::)
+           *k = 0;
            break;
        default:
            LOG("ERROR unhandled ktype %d\n", ktype);

@@ -193,6 +193,14 @@ int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
         case XD:
             EI(ei_x_encode_dict(types, values, r, opts));
             return 0;
+        case 101: // (::)
+            EI(ei_x_encode_atom(types, "ok"));
+            EI(ei_x_encode_atom(values, "ok"));
+            return 0;
+        case 104: // function projection e.g. {x+y}[1;]
+            EI(ei_x_encode_atom(types, "ok"));
+            EI(ei_x_encode_atom(values, "ok"));
+            return 0;
     }
     LOG("ERROR ei_x_encode_k unhandled type %d\n", r->t);
     return -1;

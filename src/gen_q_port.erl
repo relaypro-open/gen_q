@@ -1,10 +1,8 @@
 -module(gen_q_port).
 
--export([hopen/5, apply/5, hclose/2, hkill/2]).
+-export([hopen/5, apply/5, dot/5, eval/3, hclose/2, hkill/2]).
 
 -export([start/1, start_link/1, stop/1, init/1, call_port/2]).
-
--export([test_async/0, test_apply/1]).
 
 -define(SharedLib, "gen_q_drv").
 
@@ -19,39 +17,29 @@
 hopen(Pid, Host, Port, UserPass, Timeout) ->
     call_port(Pid, {?FuncQHOpen, [Host, Port, UserPass, Timeout]}).
 
+apply(Pid, Handle, Func, Types, Values) when is_atom(Func) ->
+    apply(Pid, Handle, atom_to_list(Func), Types, Values);
 apply(Pid, Handle, Func, Types, Values) ->
-    call_port(Pid, {?FuncQApply, [Handle, Func, {Types, Values}]}).
+    case call_port(Pid, {?FuncQApply, [Handle, Func, {Types, Values}]}) of
+        {ok, {ok, ok}} -> % (::) and function projections
+            ok;
+        Result ->
+            Result
+    end.
+
+eval(Pid, Handle, Expr) ->
+    apply(Pid, Handle, Expr, ok, ok).
+
+dot(Pid, Handle, Function, ArgTypes, ArgVals) when is_atom(Function) ->
+    apply(Pid, Handle, "{.[x 0;x 1]}",
+        {list, [symbol, ArgTypes]},
+        [Function, ArgVals]).
 
 hclose(Pid, Handle) ->
     call_port(Pid, {?FuncQHClose, [Handle]}).
 
 hkill(Pid, Handle) ->
     call_port(Pid, {?FuncQHKill, [Handle]}).
-
-test_async() ->
-    Opts = [unix_timestamp_is_q_datetime, day_seconds_is_q_time],
-    {ok, Q1} = gen_q_port:start(Opts),
-    {ok, Q2} = gen_q_port:start(Opts),
-    Tick = now(),
-    spawn(fun() ->
-                R1 = gen_q_port:call_port(Q1, 2000),
-                io:format("done 1 ~p, ~p~n", [R1, timer:now_diff(now(), Tick)]),
-                stop(Q1)
-        end),
-    spawn(fun() ->
-                R2 = gen_q_port:call_port(Q2, 3000),
-                io:format("done 2 ~p, ~p~n", [R2, timer:now_diff(now(), Tick)]),
-                stop(Q2)
-        end).
-
-test_apply(Func) ->
-    Opts = [unix_timestamp_is_q_datetime, day_seconds_is_q_time],
-    {ok, P} = start(Opts),
-    {ok, H} = hopen(P, "localhost", 5000, "us:pa", 1000),
-    R = apply(P, H, Func, integer, 1),
-    ok = hclose(P, H),
-    stop(P),
-    R.
 
 call_port(Pid, Msg) ->
     Pid ! {call, self(), Msg},

@@ -68,15 +68,20 @@ void q_apply(QWorkApply* data, QOpts* opts) {
         LOG("kapply ei error - %s\n", "ei_decode_k");
         return;
     }
+    /*
     if(!kdata) {
         HANDLE_ERROR("e2q", 3);
         LOG("kapply null kdata - %s\n", "e2q");
         return;
-    }
+    }*/
 
     // -------------
     // handle kdata
-    LOG("kapply calling %s with kdata->n size %lld\n", data->func, kdata->n);
+    if(kdata) {
+        LOG("kapply calling %s with kdata->n size %lld\n", data->func, kdata->n);
+    } else {
+        LOG("kapply calling %s with (::)\n", data->func);
+    }
     errno = 0;
     K r = k(data->handle, data->func, kdata, (K)0);
     LOG("kapply received result with type %d\n", r->t);
