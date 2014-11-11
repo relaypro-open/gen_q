@@ -20,6 +20,7 @@
             } else if(is_infinity(atom)) {                   \
                 *var = inf_val;                              \
             } else {                                         \
+                LOG("ERROR unknown atom %s\n", atom);        \
                 free(atom);                                  \
                 return -1;                                   \
             }                                                \
@@ -72,6 +73,7 @@ int ei_get_k_type(char* buff, int* ti, int* type, int* size) {
             ttype == ERL_LARGE_TUPLE_EXT) {
         // handle complex type: e.g. list, table, dict
         if(tsize <= 0 || tsize > 3) {
+            LOG("ERROR get_k_type tsize=%d\n", tsize);
             return -1;
         }
         // The first atom in the tuple defines the container type
@@ -85,6 +87,7 @@ int ei_get_k_type(char* buff, int* ti, int* type, int* size) {
     }
 
     if(ttype != ERL_ATOM_EXT) {
+        LOG("ERROR type is not an atom %d\n", ttype);
         return -1;
     }
 
@@ -150,6 +153,7 @@ int get_type_identifier_from_string(const char* str, int *type) {
     } else if(STR_EQUAL("timestamp",str)) {
         *type = -KP;
     } else {
+        LOG("ERROR unknown type string %s\n", str);
         return -1;
     }
     return 0;
@@ -159,6 +163,7 @@ int ei_decode_types_values_tuple(char *buff, int *index, int *types_index, int *
     int arity = 0;
     EI(ei_decode_tuple_header(buff, index, &arity));
     if(arity != 2) {
+        LOG("ERROR decode_types_values arity %d\n", arity);
         return -1;
     }
     *types_index = *index;
@@ -272,6 +277,7 @@ int ei_decode_k(char *buff, int* types_index, int* values_index, K* k, QOpts* op
            EI(ei_decode_dict(buff, types_index, values_index, k, opts));
            break;
        default:
+           LOG("ERROR unhandled ktype %d\n", ktype);
            return -1;
     }
     return 0;
@@ -400,7 +406,8 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
         EI(ei_get_k_type(b, ti, &ktype, &esize));
         EI(ei_decode_same_list(b, vi, ktype, k, opts));
         return 0;
-    } else if(ttype == ERL_LIST_EXT) {
+    } else if(ttype == ERL_LIST_EXT ||
+            ttype == ERL_NIL_EXT) {
         int vtype = 0;
         int vsize = 0;
         EI(ei_get_type(b, vi, &vtype, &vsize));
@@ -408,6 +415,7 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
             LOG("mixed list decoded as erlang string %d\n", 0);
             EI(ei_decode_list_header(b, ti, &tsize));
             if(tsize != vsize) {
+                LOG("ERROR general list size (string) mismatch tsize=%d, vsize=%d\n", tsize, vsize);
                 return -1;
             }
 
@@ -427,10 +435,12 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
             free(s);
             return 0;
 
-        } else if (vtype == ERL_LIST_EXT) {
+        } else if (vtype == ERL_LIST_EXT ||
+                vtype == ERL_NIL_EXT) {
             EI(ei_decode_list_header(b, ti, &tsize));
             EI(ei_decode_list_header(b, vi, &vsize));
             if(tsize != vsize) {
+                LOG("ERROR general list size (list) mismatch tsize=%d, vsize=%d\n", tsize, vsize);
                 return -1;
             }
             *k = ktn(0, vsize);
@@ -447,7 +457,10 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
             }
             return 0;
         }
+        LOG("ERROR general list value format unknown %d\n", vtype);
+        return -1;
     }
+    LOG("ERROR general list format unknown %d\n", ttype);
     return -1;
 }
 
@@ -496,6 +509,7 @@ int ei_assign_from_string(K* k, int ktype, int arity, char* v, QOpts* opts) {
                     kE(*k)[list_index] = v[list_index];
                     break;
                 default:
+                    LOG("ERROR assign from string, unhandled type %d\n", ktype);
                     return -1;
             }
         }
@@ -543,6 +557,7 @@ int ei_assign_index_from_string(K* k, int ktype, int kindex, char* v, int vindex
                 kK(*k)[kindex] = ke(v[vindex]);
                 break;
             default:
+                LOG("ERROR assign index from string, unhandled type %d\n", ktype);
                 return -1;
         }
         kK(*k)[kindex]->t = ktype;
@@ -651,7 +666,8 @@ int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts
             // This function does not support these types because lists of
             // tables and dicts are always general lists
        default:
-       return -1;
+        LOG("ERROR decode and assign unhandled type %d\n", ktype);
+        return -1;
     }
     return 0;
 }
@@ -666,6 +682,7 @@ int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts) {
     int varity = 0;
     EI(ei_decode_tuple_header(b, vi, &varity));
     if(varity != 2) {
+        LOG("ERROR decode_table bad arity %d\n", varity);
         return -1;
     }
 
@@ -682,7 +699,7 @@ int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts) {
 
     K r_cols = ktn(KS, nvcols);
     for(list_index=0; list_index < nvcols; ++list_index) {
-        EIC(ei_decode_and_assign(b, vi, KS, &r_cols, list_index, opts), r0(r_cols));
+        EIC(ei_decode_and_assign(b, vi, -KS, &r_cols, list_index, opts), r0(r_cols));
     }
     if(nvcols > 0) {
         EIC(ei_skip_term(b, vi), r0(r_cols)); // skip tail
@@ -694,18 +711,8 @@ int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts) {
     // {table, {list, QTypes}}, {ColNames,ColValues}
 
     // decode column values
-    EIC(ei_decode_list_header(b, vi, &nvcols), r0(r_cols));
-
-    K r_vals = ktn(0, nvcols);
-    for(list_index=0; list_index < nvcols; ++list_index) {
-        K column = 0;
-        EIC(ei_decode_k(b, ti, vi, &column, opts),
-                safe_deref_list2(r_cols, KS, 0, 0, r_vals, 0, list_index, nvcols));
-        kK(r_vals)[list_index] = column;
-    }
-    if(nvcols > 0) {
-        EIC(ei_skip_term(b, vi), r02(r_cols, r_vals)); // skip tail
-    }
+    K r_vals;
+    EIC(ei_decode_k(b, ti, vi, &r_vals, opts), r0(r_cols));
 
     *k = xT(xD(r_cols, r_vals));
     return 0;
@@ -721,6 +728,7 @@ int ei_decode_dict(char* b, int* ti, int* vi, K* k, QOpts* opts) {
     int varity = 0;
     EI(ei_decode_tuple_header(b, vi, &varity));
     if(varity != 2) {
+        LOG("ERROR decode_dict bad arity %d\n", varity);
         return -1;
     }
 

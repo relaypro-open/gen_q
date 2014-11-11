@@ -17,7 +17,7 @@ int ei_x_encode_ks(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 int ei_x_encode_kstring(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 
 #define EI_X_ENCODE_SAME_LIST(TYPE, ENCODER, ACCESSOR)  \
-    int ei_x_encode_same_list_##TYPE(ei_x_buff* types,   \
+    int ei_x_encode_same_list_##TYPE(ei_x_buff* types,  \
             ei_x_buff* values,                          \
             const char* t,                              \
             K r,                                        \
@@ -48,6 +48,8 @@ int ei_x_encode_same_list_byte(ei_x_buff* types, ei_x_buff* values, const char* 
 int ei_x_encode_same_list_datetime(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 int ei_x_encode_same_list_time(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 
+int ei_x_encode_table(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
+
 // helpers
 int msec_to_sec(int s);
 long long datetime_to_unix_timestamp(double d);
@@ -69,7 +71,7 @@ int ei_x_encode_k(ei_x_buff* x, K r, QOpts* opts) {
 
 int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
     if(!r) {
-        LOG("null K object! %d\n", 0);
+        LOG("ERROR null K object! %d\n", 0);
         return -1;
     }
 
@@ -77,6 +79,7 @@ int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
     switch(r->t) {
         case -128:
             // errors should be handled externally
+            LOG("ERROR we don't handle error type here %d\n", r->t);
             return -1;
         case -KT: // time
             EI(ei_x_encode_time(types, values, r, opts));
@@ -183,7 +186,11 @@ int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
         case KC:
             EI(ei_x_encode_kstring(types, values, r, opts));
             return 0;
+        case XT:
+            EI(ei_x_encode_table(types, values, r, opts));
+            return 0;
     }
+    LOG("ERROR ei_x_encode_k unhandled type %d\n", r->t);
     return -1;
 }
 
@@ -358,6 +365,24 @@ int ei_x_encode_kstring(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
     return 0;
 }
 
+int ei_x_encode_table(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
+
+    EI(ei_x_encode_tuple_header(types, 2));
+    EI(ei_x_encode_atom(types, "table"));
+
+    EI(ei_x_encode_tuple_header(values, 2));
+
+    ei_x_buff column_types;
+    ei_x_new_with_version(&column_types);
+    EIC(ei_x_encode_k_tv(&column_types, values, kK(r->k)[0], opts),
+            ei_x_free(&column_types));
+    ei_x_free(&column_types);
+
+    EI(ei_x_encode_k_tv(types, values, kK(r->k)[1], opts));
+    return 0;
+}
+
+// helpers
 int msec_to_sec(int s) {
     return s / 1000;
 }

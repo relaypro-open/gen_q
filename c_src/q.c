@@ -76,7 +76,7 @@ void q_apply(QWorkApply* data, QOpts* opts) {
 
     // -------------
     // handle kdata
-    LOG("kapply calling %s with list size %lld\n", data->func, kdata->n);
+    LOG("kapply calling %s with kdata->n size %lld\n", data->func, kdata->n);
     errno = 0;
     K r = k(data->handle, data->func, kdata, (K)0);
     LOG("kapply received result with type %d\n", r->t);

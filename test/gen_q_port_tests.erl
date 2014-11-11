@@ -39,6 +39,7 @@ gen_q_port_test_() ->
                      ?_eqe({list, short}, [15,16,17]),
                      ?_eqe_all_neighbor({list, real}, [1.1, 2.2, 3.3], ?realEps),
                      ?_eqe_all_neighbor({list, real}, [5.5, 6.5, 7.5], ?floatEps),
+                     ?_eqe({list, integer}, []),
 
                      % Test erlang encoding lists of small ints as strings:
                      ?_eqe({list, time}, [1,2,3]),
@@ -77,7 +78,17 @@ gen_q_port_test_() ->
                      ?_eqe({list, [integer, long]}, [1, 2]),
                      ?_eqe({list, [integer, long]}, [1, 2000]),
                      ?_eqe({list, [string, timestamp]}, ["test", 1236128361]),
-                     ?_eqe({list, [string, string, integer]}, ["hello", "world", 5])
+                     ?_eqe({list, [string, string, integer]}, ["hello", "world", 5]),
+                     ?_eqe({list, []}, []),
+                     ?_eqe({list, [{list, []}]}, [[]]),
+                     ?_eqe({list, [{list, []}, {list, []}]}, [[], []]),
+                     ?_eqe({list, [{list, integer}, {list, string}]}, [[1, 2], ["deep", "list"]]),
+                     ?_eqe({list, [{list, integer}, {list, string}]}, [[1000, 2000], ["deep", "list"]]),
+                     ?_eqe({list, [{list, [long, short]}]}, [[5,4]]),
+
+                     % Tables
+                     ?_eqe({table, {list, [{list, []},
+                                           {list, []}]}}, {[column1, column2], [[], []]})
                  ]
             end}.
 

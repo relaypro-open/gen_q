@@ -53,7 +53,8 @@ int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
         *str = malloc((sizeof(char))*(*len+1));
         EIC(ei_decode_string(buff, index, *str), free(str));
         return 0;
-    } else if(type == ERL_LIST_EXT) {
+    } else if(type == ERL_LIST_EXT ||
+            type == ERL_NIL_EXT) {
         // String larger than 65535
         int arity = 0;
         EI(ei_decode_list_header(buff, index, &arity));
