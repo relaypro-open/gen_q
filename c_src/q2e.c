@@ -41,10 +41,12 @@ int ei_x_encode_kstring(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 EI_X_ENCODE_SAME_LIST(symbol, ei_x_encode_atom, kS);
 EI_X_ENCODE_SAME_LIST(integer, ei_x_encode_long, kI);
 EI_X_ENCODE_SAME_LIST(long, ei_x_encode_longlong, kJ);
-EI_X_ENCODE_SAME_LIST(byte, ei_x_encode_char, kG);
 EI_X_ENCODE_SAME_LIST(short, ei_x_encode_long, kH);
 EI_X_ENCODE_SAME_LIST(real, ei_x_encode_double, kE);
 EI_X_ENCODE_SAME_LIST(float, ei_x_encode_double, kF);
+int ei_x_encode_same_list_byte(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpts* opts);
+int ei_x_encode_same_list_datetime(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
+int ei_x_encode_same_list_time(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 
 // helpers
 int msec_to_sec(int s);
@@ -136,11 +138,35 @@ int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
         case KI:
             EI(ei_x_encode_same_list_integer(types, values, "integer", r, opts));
             return 0;
+        case KU:
+            EI(ei_x_encode_same_list_integer(types, values, "minute", r, opts));
+            return 0;
+        case KV:
+            EI(ei_x_encode_same_list_integer(types, values, "second", r, opts));
+            return 0;
+        case KD:
+            EI(ei_x_encode_same_list_integer(types, values, "date", r, opts));
+            return 0;
+        case KM:
+            EI(ei_x_encode_same_list_integer(types, values, "month", r, opts));
+            return 0;
+        case KT:
+            EI(ei_x_encode_same_list_time(types, values, r, opts));
+            return 0;
         case KJ:
             EI(ei_x_encode_same_list_long(types, values, "long", r, opts));
             return 0;
+        case KN:
+            EI(ei_x_encode_same_list_long(types, values, "timespan", r, opts));
+            return 0;
+        case KP:
+            EI(ei_x_encode_same_list_long(types, values, "timestamp", r, opts));
+            return 0;
         case KG:
             EI(ei_x_encode_same_list_byte(types, values, "byte", r, opts));
+            return 0;
+        case KB:
+            EI(ei_x_encode_same_list_byte(types, values, "boolean", r, opts));
             return 0;
         case KH:
             EI(ei_x_encode_same_list_short(types, values, "short", r, opts));
@@ -150,6 +176,9 @@ int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
             return 0;
         case KF:
             EI(ei_x_encode_same_list_float(types, values, "float", r, opts));
+            return 0;
+        case KZ:
+            EI(ei_x_encode_same_list_datetime(types, values, r, opts));
             return 0;
         case KC:
             EI(ei_x_encode_kstring(types, values, r, opts));
@@ -246,18 +275,65 @@ int ei_x_encode_general_list(ei_x_buff* types, ei_x_buff* values, K r, QOpts* op
     return 0;
 }
 
+int ei_x_encode_same_list_byte(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpts* opts) {
+    EI(ei_x_encode_tuple_header(types, 2));
+    EI(ei_x_encode_atom(types, "list"));
+    EI(ei_x_encode_atom(types, t));
+    if(r->n == 0) {
+        EI(ei_x_encode_empty_list(values));
+    } else {
+        EI(ei_x_encode_string_len(values, (const char*)kG(r), r->n));
+    }
+    return 0;
+}
+
+int ei_x_encode_same_list_datetime(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
+    if(opts->unix_timestamp_is_q_datetime) {
+        EI(ei_x_encode_tuple_header(types, 2));
+        EI(ei_x_encode_atom(types, "list"));
+        EI(ei_x_encode_atom(types, "datetime"));
+
+        if(r->n > 0) {
+            EI(ei_x_encode_list_header(values, r->n));
+            int i;
+            for(i=0; i<r->n; ++i) {
+                EI(ei_x_encode_longlong(values, datetime_to_unix_timestamp(kF(r)[i])));
+            }
+        }
+        EI(ei_x_encode_empty_list(values));
+    } else {
+        EI(ei_x_encode_same_list_float(types, values, "datetime", r, opts));
+    }
+    return 0;
+}
+
+int ei_x_encode_same_list_time(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
+    if(opts->day_seconds_is_q_time) {
+        EI(ei_x_encode_tuple_header(types, 2));
+        EI(ei_x_encode_atom(types, "list"));
+        EI(ei_x_encode_atom(types, "time"));
+
+        if(r->n > 0) {
+            EI(ei_x_encode_list_header(values, r->n));
+            int i;
+            for(i=0; i<r->n; ++i) {
+                EI(ei_x_encode_long(values, msec_to_sec(kI(r)[i])));
+            }
+        }
+        EI(ei_x_encode_empty_list(values));
+    } else {
+        EI(ei_x_encode_same_list_integer(types, values, "time", r, opts));
+    }
+    return 0;
+}
+
 int ei_x_encode_kstring(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
     EI(ei_x_encode_atom(types, "string"));
     if(r->n == 0) {
         EI(ei_x_encode_empty_list(values));
     } else {
-        EI(ei_x_encode_list_header(values, r->n));
-        int i;
-        for(i=0; i<r->n; ++i) {
-            EI(ei_x_encode_char(values, kC(r)[i]));
-        }
+        EI(ei_x_encode_string_len(values, (const char*)kC(r), r->n));
     }
-    EI(ei_x_encode_empty_list(values));
     return 0;
 }
 

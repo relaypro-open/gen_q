@@ -311,14 +311,32 @@ int ei_decode_kh(char* b, int* i, short* kh, QOpts* opts) {
 
 int ei_decode_kf(char* b, int* i, double* kf, QOpts* opts) {
     EI_NULL_OR_INFINITY(kf, nf, wf);
-    EI(ei_decode_double(b, i, kf));
+    int type = 0;
+    int arity = 0;
+    EI(ei_get_type(b, i, &type, &arity));
+    if(type == ERL_FLOAT_EXT) {
+        EI(ei_decode_double(b, i, kf));
+    } else {
+        long long v = 0;
+        EI(ei_decode_longlong(b, i, &v));
+        *kf = (double)v;
+    }
     return 0;
 }
 
 int ei_decode_ke(char* b, int* i, float* ke, QOpts* opts) {
-    double v = 0;
-    EI(ei_decode_double(b, i, &v));
-    *ke = (float)v;
+    int type = 0;
+    int arity = 0;
+    EI(ei_get_type(b, i, &type, &arity));
+    if(type == ERL_FLOAT_EXT) {
+        double v = 0;
+        EI(ei_decode_double(b, i, &v));
+        *ke = (float)v;
+    } else {
+        long v = 0;
+        EI(ei_decode_long(b, i, &v));
+        *ke = (float)v;
+    }
     return 0;
 }
 
@@ -347,7 +365,16 @@ int ei_decode_datetime(char* b, int* i, double* dt, QOpts* opts) {
         EI(ei_decode_longlong(b, i, &v));
         *dt = unix_timestamp_to_datetime(v);
     } else {
-        EI(ei_decode_double(b, i, dt));
+        int type = 0;
+        int arity = 0;
+        EI(ei_get_type(b, i, &type, &arity));
+        if(type == ERL_FLOAT_EXT) {
+            EI(ei_decode_double(b, i, dt));
+        } else {
+            long long v = 0;
+            EI(ei_decode_longlong(b, i, &v));
+            *dt = v;
+        }
     }
     return 0;
 }
