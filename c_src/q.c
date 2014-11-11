@@ -7,6 +7,7 @@
 #include "q2e.h"
 
 int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts);
+int ei_x_encode_decodebinary_result(QWorkDecodeBinary* data, K r, QOpts* opts);
 
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
@@ -117,10 +118,35 @@ int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts) {
     return 0;
 }
 
- void q_hkill(QWorkHKill* data) {
+void q_hkill(QWorkHKill* data) {
     LOG("killing %ld\n", data->handle);
-
+ 
     errno = 0;
     k((I)data->handle, (const S)"\\\\", (K)0);
     HANDLE_K_ERRNO(/* No cleanup */);
- }
+}
+
+void q_decodebinary(QWorkDecodeBinary* data, QOpts* opts) {
+    LOG("decodebinary %lld\n", data->binary->n);
+    errno = 0;
+    K r = d9(data->binary);
+    HANDLE_K_ERRNO(/* No cleanup */);
+    if(!r) {
+        HANDLE_ERROR("bin", 3);
+        return;
+    }
+
+    int result = ei_x_encode_decodebinary_result(data, r, opts);
+    r0(r);
+    if(result < 0) {
+        HANDLE_ERROR("eix", 3);
+        return;
+    }
+}
+
+int ei_x_encode_decodebinary_result(QWorkDecodeBinary* data, K r, QOpts* opts) {
+    EI(ei_x_new(&data->x));
+    data->has_x = 1;
+    EI(ei_x_encode_k(&data->x, r, opts));
+    return 0;
+}

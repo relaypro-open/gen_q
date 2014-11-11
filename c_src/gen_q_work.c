@@ -16,18 +16,21 @@ int decode_op_hopen(char *buff, int *index, QWork *work);
 int decode_op_hclose(char *buff, int *index, QWork *work);
 int decode_op_apply(char *buff, int *index, QWork *work);
 int decode_op_hkill(char *buff, int *index, QWork *work);
+int decode_op_decodebinary(char *buff, int *index, QWork *work);
 
 /* DO WORK internal function declarations */
 void work_hopen(QWorkHOpen* data);
 void work_hclose(QWorkHClose* data);
 void work_apply(QWorkApply* data, QOpts* opts);
 void work_hkill(QWorkHKill* data);
+void work_decodebinary(QWorkDecodeBinary* data, QOpts* opts);
 
 /* RESULT internal function declarations */
 int work_result_hopen(QWorkHOpen* data, ei_x_buff *buff);
 int work_result_hclose(QWorkHClose* data, ei_x_buff *buff);
 int work_result_apply(QWorkApply* data, ei_x_buff *buff);
 int work_result_hkill(QWorkHKill* data, ei_x_buff *buff);
+int work_result_decodebinary(QWorkDecodeBinary* data, ei_x_buff *buff);
 
 /* FREE internal function declarations */
 void free_qopts(QOpts* data);
@@ -36,6 +39,7 @@ void free_qwork_hopen(QWorkHOpen *data);
 void free_qwork_hclose(QWorkHClose *data);
 void free_qwork_apply(QWorkApply *data);
 void free_qwork_hkill(QWorkHKill* data);
+void free_qwork_decodebinary(QWorkDecodeBinary* data);
 
 #define HANDLE_DATA_ERROR                           \
     if(data == NULL) {                              \
@@ -96,6 +100,8 @@ int decode_op(char *buff, int* index, QWork *work) {
             return decode_op_apply(buff, index, work);
         case FUNC_Q_H_KILL:
             return decode_op_hkill(buff, index, work);
+        case FUNC_Q_DECODE_BINARY:
+            return decode_op_decodebinary(buff, index, work);
     }
     return -1;
 }
@@ -305,6 +311,47 @@ int decode_op_hkill(char *buff, int* index, QWork* work) {
     return 0;
 }
 
+int decode_op_decodebinary(char *buff, int* index, QWork* work) {
+    QWorkDecodeBinary* data = malloc(sizeof(QWorkDecodeBinary));
+
+    // init flags for safe frees
+    data->errorlen = -1;
+    data->has_x = 0;
+
+    int arity = 0;
+    EI(ei_decode_list_header(buff, index, &arity));
+    if(arity != 1) {
+        LOG("ERROR too many inputs %d\n", arity);
+        return -1;
+    }
+
+    int binarylen = 0;
+    int type = 0;
+    EI(ei_get_type(buff, index, &type, &binarylen));
+    if(type != ERL_BINARY_EXT) {
+        LOG("ERROR input is not a binary %d\n", type);
+        return -1;
+    }
+
+    LOG("decodebinary type %d len %d\n", type, binarylen);
+
+    data->binary = ktn(KG, binarylen);
+    long v = 0;
+
+    LOG("decodebinary decoding %d\n", binarylen);
+    EI(ei_decode_binary(buff, index, kG(data->binary), &v));
+    LOG("decodebinary got binary len %ld\n", v);
+
+    EI(ei_skip_term(buff, index)); // skip tail
+
+    // outputs
+    data->error = NULL;
+    data->has_x = 0;
+
+    work->data = data;
+    return 0;
+}
+
 /**
  * DO WORK
  */
@@ -326,6 +373,9 @@ void genq_work(void *w) {
         case FUNC_Q_H_KILL:
             work_hkill((QWorkHKill*)work->data);
             break;
+        case FUNC_Q_DECODE_BINARY:
+            work_decodebinary((QWorkDecodeBinary*)work->data, work->opts);
+            break;
     }
 }
 
@@ -345,6 +395,10 @@ void work_hkill(QWorkHKill* data) {
     q_hkill(data);
 }
 
+void work_decodebinary(QWorkDecodeBinary* data, QOpts* opts) {
+    q_decodebinary(data, opts);
+}
+
 /**
  * RESULT
  */
@@ -362,6 +416,8 @@ int genq_work_result(void *w, ei_x_buff *buff) {
             return work_result_apply((QWorkApply*)work->data, buff);
         case FUNC_Q_H_KILL:
             return work_result_hkill((QWorkHKill*)work->data, buff);
+        case FUNC_Q_DECODE_BINARY:
+            return work_result_decodebinary((QWorkDecodeBinary*)work->data, buff);
     }
     return -1;
 }
@@ -397,7 +453,6 @@ int work_result_apply(QWorkApply* data, ei_x_buff *buff) {
     EI(ei_x_encode_ok_tuple_header(buff));
     LOG("work result append data %d\n", 0);
     EI(ei_x_append(buff, &data->x));
-    //EI(ei_x_encode_atom(buff, "jms"));
     LOG("work result return %d\n", 0);
     return 0;
 }
@@ -406,6 +461,17 @@ int work_result_hkill(QWorkHKill* data, ei_x_buff* buff) {
     LOG("work result hkill %d\n", 0);
     HANDLE_DATA_ERROR;
     EI(ei_x_encode_ok(buff));
+    return 0;
+}
+
+int work_result_decodebinary(QWorkDecodeBinary* data, ei_x_buff* buff) {
+    HANDLE_DATA_ERROR;
+    if(!data->has_x) {
+        EI(ei_x_encode_error_tuple_string(buff, "No data"));
+        return 0;
+    }
+    EI(ei_x_encode_ok_tuple_header(buff));
+    EI(ei_x_append(buff, &data->x));
     return 0;
 }
 
@@ -496,6 +562,19 @@ void free_qwork_hkill(QWorkHKill* data) {
     if(data->errorlen >= 0) {
         LOG("free qwork hkill - errorlen %d\n", data->errorlen);
         free(data->error);
+    }
+    free(data);
+}
+
+void free_qwork_decodebinary(QWorkDecodeBinary* data) {
+    if(data->binary) {
+        r0(data->binary);
+    }
+    if(data->errorlen >= 0) {
+        free(data->error);
+    }
+    if(data->has_x) {
+        ei_x_free(&data->x);
     }
     free(data);
 }

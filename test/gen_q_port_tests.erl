@@ -111,7 +111,14 @@ gen_q_port_test_() ->
                      ?_assertMatch(ok, gen_q_port:eval(P, H, "gen_q_port_monad:{`long$x*2}")),
                      ?_assertMatch({ok,{long,10}}, gen_q_port:apply(P, H, gen_q_port_monad, long, 5)),
                      ?_assertMatch(ok, gen_q_port:eval(P, H, "gen_q_port_diad:{`long$x*y}")),
-                     ?_assertMatch({ok,{long,56}}, gen_q_port:dot(P, H, gen_q_port_diad, {list, long}, [8, 7]))
+                     ?_assertMatch({ok,{long,56}}, gen_q_port:dot(P, H, gen_q_port_diad, {list, long}, [8, 7])),
+
+                     % Binary decoding
+                     ?_assertMatch({ok,{long,1}}, gen_q_port:decode_binary(P,
+                             <<16#01, 16#00, 16#00, 16#00,
+                               16#11, 16#00, 16#00, 16#00,
+                               16#f9,
+                               16#01, 16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#00>>))
                  ]
             end}.
 

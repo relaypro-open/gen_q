@@ -3,12 +3,14 @@
 
 #include "erl_driver.h"
 #include "ei.h"
+#include "k.h"
 
 #define FUNC_OPTS 0
 #define FUNC_Q_H_OPEN 1
 #define FUNC_Q_H_CLOSE 2
 #define FUNC_Q_APPLY 3
 #define FUNC_Q_H_KILL 4
+#define FUNC_Q_DECODE_BINARY 5
 
 typedef struct {
     int unix_timestamp_is_q_datetime;
@@ -54,6 +56,17 @@ typedef struct {
     int errorlen;
     char* error;
 } QWorkHKill;
+
+typedef struct {
+    // input
+    K binary;
+
+    // output
+    int errorlen;
+    char* error;
+    int has_x;
+    ei_x_buff x;
+} QWorkDecodeBinary;
 
 typedef struct {
     // input

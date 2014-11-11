@@ -1,6 +1,6 @@
 -module(gen_q_port).
 
--export([hopen/5, apply/5, dot/5, eval/3, hclose/2, hkill/2]).
+-export([hopen/5, apply/5, dot/5, eval/3, hclose/2, hkill/2, decode_binary/2]).
 
 -export([start/1, start_link/1, stop/1, init/1, call_port/2]).
 
@@ -11,6 +11,7 @@
 -define(FuncQHClose, 2).
 -define(FuncQApply, 3).
 -define(FuncQHKill, 4).
+-define(FuncQDecodeBinary, 5).
 
 -include("../include/gen_q.hrl").
 
@@ -40,6 +41,9 @@ hclose(Pid, Handle) ->
 
 hkill(Pid, Handle) ->
     call_port(Pid, {?FuncQHKill, [Handle]}).
+
+decode_binary(Pid, Binary) ->
+    call_port(Pid, {?FuncQDecodeBinary, [Binary]}).
 
 call_port(Pid, Msg) ->
     Pid ! {call, self(), Msg},
