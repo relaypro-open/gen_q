@@ -31,6 +31,7 @@ gen_q_port_test_() ->
                      ?_eqe(symbol, 'hello'),
                      ?_eqe(string, "hello"),
                      ?_eqe_value(string, <<"hello">>, "hello"),
+                     ?_eqe({list, string}, ["first string", "second string"]),
                      ?_eqe({list, symbol}, [abc, def]),
                      ?_eqe({list, integer}, [1,2,3]),
                      ?_eqe({list, long}, [10,11,12]),
@@ -75,7 +76,8 @@ gen_q_port_test_() ->
                      ?_eqe_type({list, [integer, integer]}, {list, integer}, [1,2]),
                      ?_eqe({list, [integer, long]}, [1, 2]),
                      ?_eqe({list, [integer, long]}, [1, 2000]),
-                     ?_eqe({list, [string, timestamp]}, ["test", 1236128361])
+                     ?_eqe({list, [string, timestamp]}, ["test", 1236128361]),
+                     ?_eqe({list, [string, string, integer]}, ["hello", "world", 5])
                  ]
             end}.
 

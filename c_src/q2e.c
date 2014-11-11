@@ -263,14 +263,35 @@ int ei_x_encode_general_list(ei_x_buff* types, ei_x_buff* values, K r, QOpts* op
     EI(ei_x_encode_atom(types, "list"));
 
     if(r->n > 0) {
-        EI(ei_x_encode_list_header(types, 2));
+        int all_strings = 1;
         EI(ei_x_encode_list_header(values, r->n));
         int i;
         for(i=0; i<r->n; ++i) {
-            EI(ei_x_encode_k_tv(types, values, kK(r)[i], opts));
+            K elem = kK(r)[i];
+            if(elem->t != KC) {
+                all_strings = 0;
+                break;
+            }
+            EI(ei_x_encode_string_len(values, (const char*)kC(elem), elem->n));
         }
+
+        if(all_strings) {
+            EI(ei_x_encode_atom(types, "string"));
+        } else {
+            EI(ei_x_encode_list_header(types, r->n));
+            int j;
+            for(j=0; j<i; ++j) {
+                EI(ei_x_encode_atom(types, "string"));
+            }
+
+            for(; i<r->n; ++i) {
+                EI(ei_x_encode_k_tv(types, values, kK(r)[i], opts));
+            }
+            EI(ei_x_encode_empty_list(types));
+        }
+    } else {
+        EI(ei_x_encode_empty_list(types));
     }
-    EI(ei_x_encode_empty_list(types));
     EI(ei_x_encode_empty_list(values));
     return 0;
 }
