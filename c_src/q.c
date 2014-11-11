@@ -6,7 +6,7 @@
 #include "e2q.h"
 #include "q2e.h"
 
-int ei_x_encode_apply_result(QWorkApply* data, K r);
+int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts);
 
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
@@ -92,7 +92,7 @@ void q_apply(QWorkApply* data, QOpts* opts) {
         return;
     }
 
-    int encode_result = ei_x_encode_apply_result(data, r);
+    int encode_result = ei_x_encode_apply_result(data, r, opts);
 
     r0(r);
 
@@ -104,11 +104,11 @@ void q_apply(QWorkApply* data, QOpts* opts) {
     LOG("kapply encode success %d\n", 0);
 }
 
-int ei_x_encode_apply_result(QWorkApply* data, K r) {
+int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts) {
     EI(ei_x_new(&data->x));
     data->has_x = 1;
     //EI(ei_x_encode_atom(&data->x, "ok"));
-    EI(ei_x_encode_k(&data->x, r));
+    EI(ei_x_encode_k(&data->x, r, opts));
     return 0;
 }
 

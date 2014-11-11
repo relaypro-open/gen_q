@@ -39,7 +39,7 @@ int ei_decode_kj(char* b, int* i, long long* kj, QOpts* opts);
 int ei_decode_kh(char* b, int* i, short* kh, QOpts* opts);
 int ei_decode_kf(char* b, int* i, double* kf, QOpts* opts);
 int ei_decode_ke(char* b, int* i, float* ke, QOpts* opts);
-int ei_decode_kc(char* b, int* i, char* kc, QOpts* opts);
+int ei_decode_kc(char* b, int* i, unsigned char* kc, QOpts* opts);
 int ei_decode_kg(char* b, int* i, unsigned char* kg, QOpts* opts);
 int ei_decode_kb(char* b, int* i, unsigned char* kb, QOpts* opts);
 int ei_decode_datetime(char* b, int* i, double* dt, QOpts* opts);
@@ -206,12 +206,13 @@ int ei_decode_k(char *buff, int* types_index, int* values_index, K* k, QOpts* op
            EI(ei_decode_ki(buff, values_index, &(*k)->i, opts));
            break;
        case -KP: // timestamp
-           *k = kp(0);
+           *k = kj(0);
+           (*k)->t = -KP;
            EI(ei_decode_kj(buff, values_index, &(*k)->j, opts));
            break;
        case -KC: // char
            *k = kc(0);
-           EI(ei_decode_kc(buff, values_index, &(*k)->u, opts));
+           EI(ei_decode_kc(buff, values_index, &(*k)->g, opts));
            break;
        case -KF: // float
            *k = kf(0);
@@ -321,8 +322,10 @@ int ei_decode_ke(char* b, int* i, float* ke, QOpts* opts) {
     return 0;
 }
 
-int ei_decode_kc(char* b, int* i, char* kc, QOpts* opts) {
-    EI(ei_decode_char(b, i, kc));
+int ei_decode_kc(char* b, int* i, unsigned char* kc, QOpts* opts) {
+    char c = 0;
+    EI(ei_decode_char(b, i, &c));
+    *kc = (unsigned char)c;
     return 0;
 }
 
@@ -391,22 +394,84 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
 }
 
 int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts) {
+    int type = 0;
     int arity = 0;
-    EI(ei_decode_list_header(b, i, &arity));
+    EI(ei_get_type(b, i, &type, &arity));
+    if(type == ERL_STRING_EXT) {
+        // erlang encodes some lists of integers as strings
 
-    if(ktype == K_STR) {
-        *k = ktn(0, arity);
-    } else {
+        char* v = malloc(sizeof(char)*arity);
+        EIC(ei_decode_string(b, i, v), free(v));
+
         *k = ktn(-ktype, arity);
-    }
+        int list_index;
+        if(ktype == -KT && opts->day_seconds_is_q_time) {
+            for(list_index=0; list_index < arity; ++list_index) {
+                kI(*k)[list_index] = sec_to_msec(v[list_index]);
+            }
+        } else if(ktype == -KZ && opts->unix_timestamp_is_q_datetime) {
+            for(list_index=0; list_index < arity; ++list_index) {
+                kF(*k)[list_index] = unix_timestamp_to_datetime(v[list_index]);
+            }
+        } else {
+            for(list_index=0; list_index < arity; ++list_index) {
+                switch(ktype) {
+                    case -KT:
+                    case -KV:
+                    case -KU:
+                    case -KI:
+                    case -KD:
+                    case -KM:
+                        kI(*k)[list_index] = v[list_index];
+                        break;
+                    case -KN:
+                    case -KP:
+                    case -KJ:
+                        kJ(*k)[list_index] = v[list_index];
+                        break;
+                    case -KG:
+                    case -KB:
+                        kG(*k)[list_index] = v[list_index];
+                        break;
+                    case -KH:
+                        kH(*k)[list_index] = v[list_index];
+                        break;
+                    case -KC:
+                        kC(*k)[list_index] = v[list_index];
+                        break;
+                    case -KF:
+                    case -KZ:
+                        kF(*k)[list_index] = v[list_index];
+                        break;
+                    case -KE:
+                        kE(*k)[list_index] = v[list_index];
+                        break;
+                    default:
+                        free(v);
+                        return -1;
+                }
+            }
+        }
+        free(v);
 
-    int list_index;
-    for(list_index=0; list_index < arity; ++list_index) {
-        EIC(ei_decode_and_assign(b, i, ktype, k, list_index, opts),
-                safe_deref_list(*k, 0, list_index, arity));
-    }
-    if(arity > 0) {
-        EIC(ei_skip_term(b, i), r0(*k)); // skip tail
+    } else {
+
+        EI(ei_decode_list_header(b, i, &arity));
+
+        if(ktype == K_STR) {
+            *k = ktn(0, arity);
+        } else {
+            *k = ktn(-ktype, arity);
+        }
+
+        int list_index;
+        for(list_index=0; list_index < arity; ++list_index) {
+            EIC(ei_decode_and_assign(b, i, ktype, k, list_index, opts),
+                    safe_deref_list(*k, 0, list_index, arity));
+        }
+        if(arity > 0) {
+            EIC(ei_skip_term(b, i), r0(*k)); // skip tail
+        }
     }
     return 0;
 }
@@ -436,12 +501,8 @@ int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts
            EI(ei_decode_kf(b, i, &kF(*k)[list_index], opts));
            break;
        case -KC: // char
-       {
-           char c = 0;
-           EI(ei_decode_kc(b, i, &c, opts));
-           kC(*k)[list_index] = (unsigned char)c;
+           EI(ei_decode_kc(b, i, &kC(*k)[list_index], opts));
            break;
-       }
        case -KE: // real
            EI(ei_decode_ke(b, i, &kE(*k)[list_index], opts));
            break;
