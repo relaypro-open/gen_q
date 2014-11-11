@@ -88,7 +88,19 @@ gen_q_port_test_() ->
 
                      % Tables
                      ?_eqe({table, {list, [{list, []},
-                                           {list, []}]}}, {[column1, column2], [[], []]})
+                                           {list, []}]}}, {[column1, column2], [[], []]}),
+                     ?_eqe({table, {list, [{list, []},
+                                           {list, byte}]}}, {[column1, column2], [[], []]}),
+                     ?_eqe({table, {list, [{list, string},
+                                           {list, long},
+                                           {list, datetime}]}}, {[string, long, datetime],
+                                                                 [["a","b","c","d"],
+                                                                  [123123123,112431245435,123412352345,1247124],
+                                                                  [342.123, 234.1823, 13412.1238, 12312.12381]]}),
+
+                     % Dicts
+                     ?_eqe({dict, {list, integer}, {list, integer}}, {[1,2,3], [4,5,6]}),
+                     ?_eqe({dict, {list, symbol}, {list, string}}, {[a,b,c], ["string4","string5","string6"]})
                  ]
             end}.
 

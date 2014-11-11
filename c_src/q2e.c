@@ -49,6 +49,7 @@ int ei_x_encode_same_list_datetime(ei_x_buff* types, ei_x_buff* values, K r, QOp
 int ei_x_encode_same_list_time(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 
 int ei_x_encode_table(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
+int ei_x_encode_dict(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 
 // helpers
 int msec_to_sec(int s);
@@ -188,6 +189,9 @@ int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
             return 0;
         case XT:
             EI(ei_x_encode_table(types, values, r, opts));
+            return 0;
+        case XD:
+            EI(ei_x_encode_dict(types, values, r, opts));
             return 0;
     }
     LOG("ERROR ei_x_encode_k unhandled type %d\n", r->t);
@@ -379,6 +383,15 @@ int ei_x_encode_table(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
     ei_x_free(&column_types);
 
     EI(ei_x_encode_k_tv(types, values, kK(r->k)[1], opts));
+    return 0;
+}
+
+int ei_x_encode_dict(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
+    EI(ei_x_encode_tuple_header(types, 3));
+    EI(ei_x_encode_atom(types, "dict"));
+    EI(ei_x_encode_tuple_header(values, 2));
+    EI(ei_x_encode_k_tv(types, values, kK(r)[0], opts));
+    EI(ei_x_encode_k_tv(types, values, kK(r)[1], opts));
     return 0;
 }
 
