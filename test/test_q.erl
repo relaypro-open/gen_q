@@ -32,7 +32,7 @@ loop(P5, Pid, Ready) ->
     end,
     loop(P5, Pid2, Ready).
 
-stop(QPid, PortPid, QHandle) ->
+stop(QPid, _PortPid, QHandle) ->
     exit(QPid, kill),
-    gen_q_port:hkill(PortPid, QHandle).
+    q:hkill(QHandle).
 

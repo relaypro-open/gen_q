@@ -34,14 +34,14 @@
     end).
 -define(_assertAllNeighborhood(Expect, Expr, Epsilon), ?_test(?assertAllNeighborhood(Expect, Expr, Epsilon))).
 
--define(_eqe(Type, Value), ?_assertMatch({ok, {Type, Value}}, gen_q_port:apply(P, H, "(::)", Type, Value))).
--define(_eqe_value(Type, InValue, OutValue), ?_assertMatch({ok, {Type, OutValue}}, gen_q_port:apply(P, H, "(::)", Type, InValue))).
--define(_eqe_type(InType, OutType, Value), ?_assertMatch({ok, {OutType, Value}}, gen_q_port:apply(P, H, "(::)", InType, Value))).
+-define(_eqe(Type, Value), ?_assertMatch({ok, {Type, Value}}, q:apply(H, "(::)", Type, Value))).
+-define(_eqe_value(Type, InValue, OutValue), ?_assertMatch({ok, {Type, OutValue}}, q:apply(H, "(::)", Type, InValue))).
+-define(_eqe_type(InType, OutType, Value), ?_assertMatch({ok, {OutType, Value}}, q:apply(H, "(::)", InType, Value))).
 
 -define(eqe_neighbor(Type, Value, Eps),
           begin
                   ((fun (__ExpectType, __ExpectValue) ->
-                      case gen_q_port:apply(P, H, "(::)", Type, Value) of
+                      case q:apply(H, "(::)", Type, Value) of
                           {ok, {__ExpectType, __Value2}} ->
                               ?assertNeighborhood(__ExpectValue, __Value2, Eps);
                           {ok, {__Type2, _}} ->
@@ -65,7 +65,7 @@
 -define(eqe_all_neighbor(Type, Value, Eps),
     begin
             ((fun (__ExpectType, __ExpectValue) ->
-                case gen_q_port:apply(P, H, "(::)", Type, Value) of
+                case q:apply(H, "(::)", Type, Value) of
                     {ok, {__ExpectType, __Value2}} ->
                         ?assertAllNeighborhood(__ExpectValue, __Value2, Eps);
                     {ok, {__Type2, _}} ->

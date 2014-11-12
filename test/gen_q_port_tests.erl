@@ -11,7 +11,7 @@ gen_q_port_test_() ->
     {setup,
             fun setup/0,
             fun teardown/1,
-            fun(#ctx{port=P, h=H}) ->
+            fun(#ctx{h=H}) ->
                     [?_eqe(time, 43200000), % `int$12t
                      ?_eqe(second, 45042), % `int$`second$12:30:42
                      ?_eqe(minute, 750), % `int$`minute$12:30:42
@@ -108,13 +108,13 @@ gen_q_port_test_() ->
                               {{[c],[[a,b,c]]},{[a,b],[[1,2,3],[4,5,6]]}}),
 
                      % Function definition and execution
-                     ?_assertMatch(ok, gen_q_port:eval(P, H, "gen_q_port_monad:{`long$x*2}")),
-                     ?_assertMatch({ok,{long,10}}, gen_q_port:apply(P, H, gen_q_port_monad, long, 5)),
-                     ?_assertMatch(ok, gen_q_port:eval(P, H, "gen_q_port_diad:{`long$x*y}")),
-                     ?_assertMatch({ok,{long,56}}, gen_q_port:dot(P, H, gen_q_port_diad, {list, long}, [8, 7])),
+                     ?_assertMatch(ok, q:eval(H, "gen_q_port_monad:{`long$x*2}")),
+                     ?_assertMatch({ok,{long,10}}, q:apply(H, gen_q_port_monad, long, 5)),
+                     ?_assertMatch(ok, q:eval(H, "gen_q_port_diad:{`long$x*y}")),
+                     ?_assertMatch({ok,{long,56}}, q:dot(H, gen_q_port_diad, {list, long}, [8, 7])),
 
                      % Binary decoding
-                     ?_assertMatch({ok,{long,1}}, gen_q_port:decode_binary(P,
+                     ?_assertMatch({ok,{long,1}}, q:decode_binary(
                              <<16#01, 16#00, 16#00, 16#00,
                                16#11, 16#00, 16#00, 16#00,
                                16#f9,
@@ -126,7 +126,7 @@ gen_q_port_utiqd_test_() ->
     {setup,
             fun setup_utiqd/0,
             fun teardown/1,
-            fun(#ctx{port=P, h=H}) ->
+            fun(#ctx{h=H}) ->
                     [?_eqe(datetime, 1415630000),
                      ?_eqe_all_neighbor({list, datetime}, [1,2,3], 1.5),
                      ?_eqe_all_neighbor({list, datetime}, [1000,2000,3000], 1.5)]
@@ -136,7 +136,7 @@ gen_q_port_dsiqt_test_() ->
     {setup,
             fun setup_dsiqt/0,
             fun teardown/1,
-            fun(#ctx{port=P, h=H}) ->
+            fun(#ctx{h=H}) ->
                     [?_eqe(time, 43200),
                      ?_eqe({list, time}, [1,2,3]),
                      ?_eqe({list, time}, [1000,2000,3000])]
@@ -153,11 +153,11 @@ setup_dsiqt() ->
 
 setup(Opts) ->
     {ok, Q} = test_q:start(),
-    {ok, P} = gen_q_port:start(Opts),
-    {ok, H} = gen_q_port:hopen(P, "localhost", 5000, "us:pa", 1000),
+    {ok, P} = q:start(Opts),
+    {ok, H} = q:hopen("localhost", 5000, "us:pa", 1000),
     #ctx{qpid=Q, port=P, h=H}.
 
 teardown(#ctx{qpid=Q, port=P, h=H}) ->
-    test_q:stop(Q, P, H).
-    % For some reason, stoppping the port causes rebar to segfault
-    %ok = gen_q_port:stop(P),
+    test_q:stop(Q, P, H),
+    %% Note: Stopping the port causes *rebar* to segfault for some reason
+    catch q:stop().
