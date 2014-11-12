@@ -46,6 +46,14 @@ static void gen_q_drv_output(ErlDrvData handle, char *buff,
         driver_output(d->port, ok.buff, ok.index);
         ei_x_free(&ok);
         return;
+    } else if(work->data == NULL) {
+        genq_free_work(work);
+        ei_x_buff error;
+        ei_x_new(&error);
+        ei_x_encode_error_tuple_atom(&error, "badarg");
+        driver_output(d->port, error.buff, error.index);
+        ei_x_free(&error);
+        return;
     }
     work->opts = &d->opts;
     driver_async(d->port, NULL,

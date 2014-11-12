@@ -82,6 +82,8 @@ void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
 
     int res = decode_op(buff, &index, work);
     if(res < 0) {
+        free_qwork_data(work->op, work->data);
+        work->data = NULL;
         return work;
     }
 
@@ -149,6 +151,7 @@ int decode_op_opts(char* buff, int* index, QWork* work) {
 
 int decode_op_hopen(char *buff, int* index, QWork* work) {
     QWorkHOpen* data = malloc(sizeof(QWorkHOpen));
+    work->data = data;
 
     // init flags for safe frees
     data->hostlen = -1;
@@ -180,12 +183,12 @@ int decode_op_hopen(char *buff, int* index, QWork* work) {
     data->handle = -1;
     data->error = NULL;
 
-    work->data = data;
     return 0;
 }
 
 int decode_op_hclose(char *buff, int* index, QWork* work) {
     QWorkHClose* data = malloc(sizeof(QWorkHClose));
+    work->data = data;
 
     // init flags for safe frees
     data->errorlen = -1;
@@ -221,12 +224,12 @@ int decode_op_hclose(char *buff, int* index, QWork* work) {
     // outputs
     data->error = NULL;
 
-    work->data = data;
     return 0;
 }
 
 int decode_op_apply(char *buff, int* index, QWork* work) {
     QWorkApply* data = malloc(sizeof(QWorkApply));
+    work->data = data;
 
     // init flags for safe frees
     data->funclen = -1;
@@ -268,12 +271,12 @@ int decode_op_apply(char *buff, int* index, QWork* work) {
     // outputs
     data->error = NULL;
 
-    work->data = data;
     return 0;
 }
 
 int decode_op_hkill(char *buff, int* index, QWork* work) {
     QWorkHKill* data = malloc(sizeof(QWorkHKill));
+    work->data = data;
 
     // init flags for safe frees
     data->errorlen = -1;
@@ -307,12 +310,12 @@ int decode_op_hkill(char *buff, int* index, QWork* work) {
     // outputs
     data->error = NULL;
 
-    work->data = data;
     return 0;
 }
 
 int decode_op_decodebinary(char *buff, int* index, QWork* work) {
     QWorkDecodeBinary* data = malloc(sizeof(QWorkDecodeBinary));
+    work->data = data;
 
     // init flags for safe frees
     data->errorlen = -1;
@@ -348,7 +351,6 @@ int decode_op_decodebinary(char *buff, int* index, QWork* work) {
     data->error = NULL;
     data->has_x = 0;
 
-    work->data = data;
     return 0;
 }
 
@@ -486,6 +488,7 @@ void genq_free_work(void *w) {
 }
 
 void free_qwork_data(int op, void *data) {
+    if(!data) return;
     switch(op) {
         case FUNC_OPTS:
             LOG("free qwork opts %d\n", 0);
@@ -511,10 +514,12 @@ void free_qwork_data(int op, void *data) {
 }
 
 void free_qopts(QOpts* data) {
+    if(!data) return;
     free(data);
 }
 
 void free_qwork_hopen(QWorkHOpen *data) {
+    if(!data) return;
     if(data->errorlen >= 0) {
         LOG("free qwork hopen - errorlen %d\n", data->errorlen);
         free(data->error);
@@ -531,6 +536,7 @@ void free_qwork_hopen(QWorkHOpen *data) {
 }
 
 void free_qwork_hclose(QWorkHClose *data) {
+    if(!data) return;
     if(data->errorlen >= 0) {
         LOG("free qwork hclose - errorlen %d\n", data->errorlen);
         free(data->error);
@@ -539,6 +545,7 @@ void free_qwork_hclose(QWorkHClose *data) {
 }
 
 void free_qwork_apply(QWorkApply *data) {
+    if(!data) return;
     if(data->funclen >= 0) {
         LOG("free qwork apply - funclen %d\n", data->funclen);
         free(data->func);
@@ -555,10 +562,12 @@ void free_qwork_apply(QWorkApply *data) {
         LOG("free qwork apply - errorlen %d\n", data->errorlen);
         free(data->error);
     }
+    LOG("free qwork apply - struct%s\n", "");
     free(data);
 }
 
 void free_qwork_hkill(QWorkHKill* data) {
+    if(!data) return;
     if(data->errorlen >= 0) {
         LOG("free qwork hkill - errorlen %d\n", data->errorlen);
         free(data->error);
@@ -567,6 +576,7 @@ void free_qwork_hkill(QWorkHKill* data) {
 }
 
 void free_qwork_decodebinary(QWorkDecodeBinary* data) {
+    if(!data) return;
     if(data->binary) {
         r0(data->binary);
     }

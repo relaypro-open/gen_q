@@ -85,9 +85,24 @@ void q_apply(QWorkApply* data, QOpts* opts) {
     }
     errno = 0;
     K r = k(data->handle, data->func, kdata, (K)0);
-    LOG("kapply received result with type %d\n", r->t);
+    if(r) {
+        LOG("kapply received result with type %d\n", r->t);
+    }
+    HANDLE_K_ERRNO(if(r) r0(r));
 
-    HANDLE_K_ERRNO(/* No cleanup */);
+    if(data->handle < 0) {
+        LOG("kapply asynchonous call, returning ok%s\n", "");
+        r0(r);
+        ei_x_new(&data->x);
+        data->has_x = 1;
+        ei_x_encode_atom(&data->x, "ok");
+        return;
+    }
+
+    if(!r) {
+        HANDLE_ERROR("null", 4);
+        return;
+    }
 
     if(r->t == -128) {
         // q error

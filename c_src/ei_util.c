@@ -46,12 +46,18 @@ int ei_x_encode_error_tuple_string_len(ei_x_buff *buff, char *str, int strlen) {
     return 0;
 }
 
+void free_alloc_string(char **str, int *len) {
+    free(*str);
+    *str = 0;
+    *len = -1;
+}
+
 int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
     int type = 0;
     EI(ei_get_type(buff, index, &type, len));
     if(type == ERL_STRING_EXT) {
         *str = malloc((sizeof(char))*(*len+1));
-        EIC(ei_decode_string(buff, index, *str), free(str));
+        EIC(ei_decode_string(buff, index, *str), free_alloc_string(str, len));
         return 0;
     } else if(type == ERL_LIST_EXT ||
             type == ERL_NIL_EXT) {
@@ -61,26 +67,28 @@ int ei_decode_alloc_string(char *buff, int *index, char **str, int *len) {
         *str = malloc((sizeof(char))*(*len+1));
         int i;
         for(i=0; i < *len; ++i) {
-            EIC(ei_decode_char(buff, index, &(*str)[i]), free(str));
+            EIC(ei_decode_char(buff, index, &(*str)[i]), free_alloc_string(str, len));
         }
         (*str)[*len] = '\0';
         if(arity > 0) {
-            EIC(ei_skip_term(buff, index), free(str)); // skip tail
+            EIC(ei_skip_term(buff, index), free_alloc_string(str, len)); // skip tail
         }
 
         return 0;
     } else if(type == ERL_ATOM_EXT) {
         *str = malloc(sizeof(char)*(*len+1));
         (*str)[*len] = '\0';
-        EIC(ei_decode_atom(buff, index, *str), free(str));
+        EIC(ei_decode_atom(buff, index, *str), free_alloc_string(str, len));
         return 0;
     } else if(type == ERL_BINARY_EXT) {
         *str = malloc(sizeof(char)*(*len+1));
         (*str)[*len] = '\0';
         long llen = 0;
-        EIC(ei_decode_binary(buff, index, *str, &llen), free(str));
+        EIC(ei_decode_binary(buff, index, *str, &llen), free_alloc_string(str, len));
         return 0;
     } else {
+        LOG("ERROR unknown type %d\n", type);
+        *len = -1;
         return -1;
     }
 }
