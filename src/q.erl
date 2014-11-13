@@ -190,7 +190,7 @@ recv_async_port_result(Port, PortTimeout) ->
 
 handle_info({'EXIT', Port, Reason}, State=#state{port=Port}) ->
     {stop, {port_terminated, Reason}, State};
-handle_info({'DOWN', Port, Reason}, State=#state{port=Port}) ->
+handle_info({'EXIT', _Pid, Reason}, State) ->
     {stop, {port_terminated, Reason}, State}.
 
 terminate({port_terminated, _Reason}, _State) ->
