@@ -20,20 +20,12 @@ clean:
 	rm -f c_src/*.o
 	rm -f priv/${app}.so
 
-subdirs: ensure-deps c_src/c.o
+subdirs: ensure-deps
 	cd deps/pmod_transform && make && cd ../..
 	@(./rebar compile)
 
 ensure-deps:
 	@(./rebar get-deps)
-
-c_src/c.o:
-ifeq ("Darwin", "${arch}")
-	cp c_src/c.o.m64 c_src/c.o
-endif
-ifeq ("Linux", "${arch}")
-	cp c_src/c.o.l64 c_src/c.o
-endif
 
 build: all
 	@(tar cvfz $(build_name).tar.gz -X build.exclude *)
