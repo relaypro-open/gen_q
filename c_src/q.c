@@ -5,6 +5,7 @@
 #include "ei_util.h"
 #include "e2q.h"
 #include "q2e.h"
+#include "gen_q.h"
 
 int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts);
 int ei_x_encode_decodebinary_result(QWorkDecodeBinary* data, K r, QOpts* opts);
@@ -84,7 +85,7 @@ void q_apply(QWorkApply* data, QOpts* opts) {
     // -------------
     // handle kdata
     if(kdata) {
-        LOG("kapply calling %s with kdata->n size %lld\n", data->func, kdata->n);
+        LOG("kapply calling %s with kdata->n size "FMT_KN"\n", data->func, kdata->n);
     } else {
         LOG("kapply calling %s with (::)\n", data->func);
     }
@@ -147,7 +148,7 @@ void q_hkill(QWorkHKill* data) {
 }
 
 void q_decodebinary(QWorkDecodeBinary* data, QOpts* opts) {
-    LOG("decodebinary %lld\n", data->binary->n);
+    LOG("decodebinary "FMT_KN"\n", data->binary->n);
     errno = 0;
     K r = d9(data->binary);
     HANDLE_K_ERRNO(/* No cleanup */);

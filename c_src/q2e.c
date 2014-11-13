@@ -1,6 +1,7 @@
 #include "q2e.h"
 #include "ei_util.h"
 #include "gen_q_log.h"
+#include "gen_q.h"
 
 // encoders
 int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
@@ -276,7 +277,7 @@ int ei_x_encode_ks(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
 }
 
 int ei_x_encode_general_list(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
-    LOG("ei_x_encode_general_list length %lld\n", r->n);
+    LOG("ei_x_encode_general_list length "FMT_KN"\n", r->n);
 
     EI(ei_x_encode_tuple_header(types, 2));
     EI(ei_x_encode_atom(types, "list"));
