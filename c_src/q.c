@@ -49,6 +49,11 @@ void q_hopen(QWorkHOpen* data) {
     HANDLE_K_ERRNO(/* No cleanup */);
 
     LOG("khpun result %d\n", data->handle);
+
+    if(data->handle == 0) {
+        HANDLE_ERROR("access", 6);
+        return;
+    }
 }
 
 void q_hclose(QWorkHClose* data) {
