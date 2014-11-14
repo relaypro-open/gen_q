@@ -17,6 +17,20 @@ int ei_x_encode_kg(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpt
 int ei_x_encode_ks(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 int ei_x_encode_kstring(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 
+int ei_x_encode_ki_val(ei_x_buff* values, int i);
+int ei_x_encode_kj_val(ei_x_buff* values, long long i);
+int ei_x_encode_kf_val(ei_x_buff* values, double f);
+int ei_x_encode_kh_val(ei_x_buff* values, short h);
+
+#define EI_X_ENCODE_NULL_OR_INF(ACCESS, NULL_VAL, INF_VAL) \
+    if(ACCESS == NULL_VAL) {                               \
+        EI(ei_x_encode_atom(values, "null"));              \
+        return 0;                                          \
+    } else if(ACCESS == INF_VAL) {                         \
+        EI(ei_x_encode_atom(values, "infinity"));          \
+        return 0;                                          \
+    }
+
 #define EI_X_ENCODE_SAME_LIST(TYPE, ENCODER, ACCESSOR)  \
     int ei_x_encode_same_list_##TYPE(ei_x_buff* types,  \
             ei_x_buff* values,                          \
@@ -40,11 +54,11 @@ int ei_x_encode_kstring(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
     }
 
 EI_X_ENCODE_SAME_LIST(symbol, ei_x_encode_atom, kS);
-EI_X_ENCODE_SAME_LIST(integer, ei_x_encode_long, kI);
-EI_X_ENCODE_SAME_LIST(long, ei_x_encode_longlong, kJ);
-EI_X_ENCODE_SAME_LIST(short, ei_x_encode_long, kH);
+EI_X_ENCODE_SAME_LIST(integer, ei_x_encode_ki_val, kI);
+EI_X_ENCODE_SAME_LIST(long, ei_x_encode_kj_val, kJ);
+EI_X_ENCODE_SAME_LIST(short, ei_x_encode_kh_val, kH);
 EI_X_ENCODE_SAME_LIST(real, ei_x_encode_double, kE);
-EI_X_ENCODE_SAME_LIST(float, ei_x_encode_double, kF);
+EI_X_ENCODE_SAME_LIST(float, ei_x_encode_kf_val, kF);
 int ei_x_encode_same_list_byte(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpts* opts);
 int ei_x_encode_same_list_datetime(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 int ei_x_encode_same_list_time(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
@@ -213,7 +227,7 @@ int ei_x_encode_time(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
     if(opts->day_seconds_is_q_time) {
         v = msec_to_sec(v);
     }
-    EI(ei_x_encode_long(values, v));
+    EI(ei_x_encode_ki_val(values, v));
     return 0;
 }
 
@@ -230,19 +244,19 @@ int ei_x_encode_datetime(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) 
 
 int ei_x_encode_ki(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpts* opts) {
     EI(ei_x_encode_atom(types, t));
-    EI(ei_x_encode_long(values, r->i));
+    EI(ei_x_encode_ki_val(values, r->i));
     return 0;
 }
 
 int ei_x_encode_kj(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpts* opts) {
     EI(ei_x_encode_atom(types, t));
-    EI(ei_x_encode_longlong(values, r->j));
+    EI(ei_x_encode_kj_val(values, r->j));
     return 0;
 }
 
 int ei_x_encode_kf(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpts* opts) {
     EI(ei_x_encode_atom(types, t));
-    EI(ei_x_encode_double(values, r->f));
+    EI(ei_x_encode_kf_val(values, r->f));
     return 0;
 }
 
@@ -260,7 +274,7 @@ int ei_x_encode_kc(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
 
 int ei_x_encode_kh(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
     EI(ei_x_encode_atom(types, "short"));
-    EI(ei_x_encode_long(values, r->h));
+    EI(ei_x_encode_kh_val(values, r->h));
     return 0;
 }
 
@@ -273,6 +287,41 @@ int ei_x_encode_kg(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpt
 int ei_x_encode_ks(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
     EI(ei_x_encode_atom(types, "symbol"));
     EI(ei_x_encode_atom(values, r->s));
+    return 0;
+}
+
+int ei_x_encode_ki_val(ei_x_buff* values, int i) {
+    EI_X_ENCODE_NULL_OR_INF(i, ni, wi);
+    EI(ei_x_encode_long(values, i));
+    return 0;
+}
+
+int ei_x_encode_kj_val(ei_x_buff* values, long long j) {
+    EI_X_ENCODE_NULL_OR_INF(j, nj, wj);
+    EI(ei_x_encode_longlong(values, j));
+    return 0;
+}
+
+int q2e_isnan(double d) {
+    return d!=d;
+}
+
+int ei_x_encode_kf_val(ei_x_buff* values, double f) {
+    EI_X_ENCODE_NULL_OR_INF(f, nf, wf);
+    if(f == nf || q2e_isnan(f)) {
+        EI(ei_x_encode_atom(values, "null"));
+        return 0;
+    } else if(f == wf) {
+        EI(ei_x_encode_atom(values, "infinity"));
+        return 0;
+    }
+    EI(ei_x_encode_double(values, f));
+    return 0;
+}
+
+int ei_x_encode_kh_val(ei_x_buff* values, short h) {
+    EI_X_ENCODE_NULL_OR_INF(h, nh, wh);
+    EI(ei_x_encode_long(values, h));
     return 0;
 }
 
@@ -358,7 +407,7 @@ int ei_x_encode_same_list_time(ei_x_buff* types, ei_x_buff* values, K r, QOpts* 
             EI(ei_x_encode_list_header(values, r->n));
             int i;
             for(i=0; i<r->n; ++i) {
-                EI(ei_x_encode_long(values, msec_to_sec(kI(r)[i])));
+                EI(ei_x_encode_ki_val(values, msec_to_sec(kI(r)[i])));
             }
         }
         EI(ei_x_encode_empty_list(values));

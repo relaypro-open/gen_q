@@ -374,6 +374,8 @@ int ei_decode_kb(char* b, int* i, unsigned char* kb, QOpts* opts) {
 }
 
 int ei_decode_datetime(char* b, int* i, double* dt, QOpts* opts) {
+    EI_NULL_OR_INFINITY(dt, nf, wf);
+
     if(opts->unix_timestamp_is_q_datetime) {
         long long v = 0;
         EI(ei_decode_longlong(b, i, &v));
