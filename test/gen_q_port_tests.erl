@@ -161,7 +161,10 @@ gen_q_port_test_() ->
                      ?_eqe({list, timestamp}, [null, infinity]),
                      ?_eqe({list, long}, [null, infinity]),
                      ?_eqe({list, float}, [null, infinity]),
-                     ?_eqe({list, short}, [null, infinity])
+                     ?_eqe({list, short}, [null, infinity]),
+
+                     % Undocumented types
+                     ?_eqe({projection, string, long, long}, {"{x+y+z}",1,2}) % type 104
                  ]
             end}.
 

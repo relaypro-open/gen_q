@@ -51,6 +51,7 @@ int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts);
 int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts* opts);
 int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts);
 int ei_decode_dict(char* b, int* ti, int* vi, K* k, QOpts* opts);
+int ei_decode_unknown(char* b, int* ti, int* vi, K* k, int ktype, QOpts* opts);
 int ei_assign_from_string(K* k, int ktype, int arity, char* v, QOpts* opts);
 int ei_assign_index_from_string(K* k, int ktype, int kindex, char* v, int vindex, QOpts* opts);
 
@@ -73,11 +74,7 @@ int ei_get_k_type(char* buff, int* ti, int* type, int* size) {
     EI(ei_get_type(buff, ti, &ttype, &tsize));
     if(ttype == ERL_SMALL_TUPLE_EXT ||
             ttype == ERL_LARGE_TUPLE_EXT) {
-        // handle complex type: e.g. list, table, dict
-        if(tsize <= 0 || tsize > 3) {
-            LOG("ERROR get_k_type tsize=%d\n", tsize);
-            return -1;
-        }
+        // handle complex type: e.g. list, table, dict, projection
         // The first atom in the tuple defines the container type
         EI(ei_decode_tuple_header(buff, ti, &tsize));
         EI(ei_get_type(buff, ti, &ttype, &tsize));
@@ -86,6 +83,13 @@ int ei_get_k_type(char* buff, int* ti, int* type, int* size) {
         // tsize has the length of the first element of the tuple
         // upon return from this function, ti will point to the
         // second element in the tuple
+    }
+
+    if(ttype == ERL_INTEGER_EXT || ttype == ERL_SMALL_INTEGER_EXT) {
+        long v = 0;
+        EI(ei_decode_long(buff, ti, &v));
+        *type = v;
+        return 0;
     }
 
     if(ttype != ERL_ATOM_EXT) {
@@ -156,6 +160,8 @@ int get_type_identifier_from_string(const char* str, int *type) {
         *type = -KN;
     } else if(STR_EQUAL("timestamp",str)) {
         *type = -KP;
+    } else if(STR_EQUAL("projection", str)) {
+        *type = 104;
     } else {
         LOG("ERROR unknown type string %s\n", str);
         return -1;
@@ -283,8 +289,15 @@ int ei_decode_k(char *buff, int* types_index, int* values_index, K* k, QOpts* op
        case 101: // (::)
            *k = 0;
            break;
+       case 104:
+           EI(ei_decode_unknown(buff, types_index, values_index, k, ktype, opts));
+           break;
        default:
-           LOG("ERROR unhandled ktype %d\n", ktype);
+           LOG("ERROR unhandled type %d\n", ktype);
+           /*
+           EI(ei_decode_unknown(buff, types_index, values_index, k, ktype, opts));
+           break;
+           */
            return -1;
     }
     return 0;
@@ -740,6 +753,21 @@ int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts) {
     EIC(ei_decode_k(b, ti, vi, &r_vals, opts), r0(r_cols));
 
     *k = xT(xD(r_cols, r_vals));
+    return 0;
+}
+
+int ei_decode_unknown(char* b, int* ti, int* vi, K* k, int ktype, QOpts* opts) {
+    int varity = 0;
+    EI(ei_decode_tuple_header(b, vi, &varity));
+
+    *k = ktn(0, varity);
+    (*k)->t = ktype;
+
+    int i;
+    for(i=0; i<varity; ++i) {
+        EIC(ei_decode_k(b, ti, vi, &kK(*k)[i], opts),
+                safe_deref_list(*k, 0, i, varity));
+    }
     return 0;
 }
 

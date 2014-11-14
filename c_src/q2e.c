@@ -17,6 +17,10 @@ int ei_x_encode_kg(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpt
 int ei_x_encode_ks(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 int ei_x_encode_kstring(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 
+int ei_x_encode_dict_impl(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpts* opts);
+int ei_x_encode_unknown(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
+int ei_x_encode_projection(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
+
 int ei_x_encode_ki_val(ei_x_buff* values, int i);
 int ei_x_encode_kj_val(ei_x_buff* values, long long i);
 int ei_x_encode_kf_val(ei_x_buff* values, double f);
@@ -213,9 +217,11 @@ int ei_x_encode_k_tv(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
             EI(ei_x_encode_atom(values, "ok"));
             return 0;
         case 104: // function projection e.g. {x+y}[1;]
-            EI(ei_x_encode_atom(types, "ok"));
-            EI(ei_x_encode_atom(values, "ok"));
+            EI(ei_x_encode_projection(types, values, r, opts));
             return 0;
+        default:
+            //EI(ei_x_encode_unknown(types, values, r, opts));
+            return -1;
     }
     LOG("ERROR ei_x_encode_k unhandled type %d\n", r->t);
     return -1;
@@ -445,11 +451,34 @@ int ei_x_encode_table(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
 }
 
 int ei_x_encode_dict(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
-    EI(ei_x_encode_tuple_header(types, 3));
-    EI(ei_x_encode_atom(types, "dict"));
-    EI(ei_x_encode_tuple_header(values, 2));
-    EI(ei_x_encode_k_tv(types, values, kK(r)[0], opts));
-    EI(ei_x_encode_k_tv(types, values, kK(r)[1], opts));
+    EI(ei_x_encode_dict_impl(types, values, "dict", r, opts));
+    return 0;
+}
+
+int ei_x_encode_unknown(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
+    EI(ei_x_encode_tuple_header(types, r->n+1));
+    EI(ei_x_encode_long(types, r->t));
+    EI(ei_x_encode_tuple_header(values, r->n));
+    int i;
+    for(i=0; i<r->n; ++i) {
+        EI(ei_x_encode_k_tv(types, values, kK(r)[i], opts));
+    }
+    return 0;
+}
+
+int ei_x_encode_projection(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts) {
+    EI(ei_x_encode_dict_impl(types, values, "projection", r, opts));
+    return 0;
+}
+
+int ei_x_encode_dict_impl(ei_x_buff* types, ei_x_buff* values, const char* t, K r, QOpts* opts) {
+    EI(ei_x_encode_tuple_header(types, r->n+1));
+    EI(ei_x_encode_atom(types, t));
+    EI(ei_x_encode_tuple_header(values, r->n));
+    int i;
+    for(i=0; i<r->n; ++i) {
+        EI(ei_x_encode_k_tv(types, values, kK(r)[i], opts));
+    }
     return 0;
 }
 
