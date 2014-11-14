@@ -28,6 +28,8 @@ gen_q_port_test_() ->
                      ?_eqe(short, 3),
                      ?_eqe(byte, 255),
                      ?_eqe(boolean, 1),
+                     ?_eqe_value(boolean, true, 1),
+                     ?_eqe_value(boolean, false, 0),
                      ?_eqe(symbol, 'hello'),
                      ?_eqe(string, "hello"),
                      ?_eqe_value(string, <<"hello">>, "hello"),
@@ -72,6 +74,9 @@ gen_q_port_test_() ->
                      ?_eqe_all_neighbor({list, real}, [1000,2000,3000], ?realEps),
                      ?_eqe({list, integer}, [1000,2000,3000]),
                      ?_eqe({list, long}, [1000,2000,3000]),
+
+                     % Other lists
+                     ?_eqe_value({list, boolean}, [1,0,1,true,false],[1,0,1,1,0]),
 
                      % Mixed lists
                      ?_eqe_type({list, [integer, integer]}, {list, integer}, [1,2]),

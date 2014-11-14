@@ -58,6 +58,8 @@ int ei_assign_index_from_string(K* k, int ktype, int kindex, char* v, int vindex
 int is_exact_atom(char* atom, const char* compare);
 int is_infinity(char* atom);
 int is_null(char* atom);
+int is_false(char* atom);
+int is_true(char* atom);
 void r02(K k1, K k2);
 void safe_deref_list(K k, int ktype, int j, int n);
 void safe_deref_list_and_free(K k, int ktype, int j, int n, void* f);
@@ -369,6 +371,20 @@ int ei_decode_kg(char* b, int* i, unsigned char* kg, QOpts* opts) {
 }
 
 int ei_decode_kb(char* b, int* i, unsigned char* kb, QOpts* opts) {
+    int etype = 0;
+    int atom_size = 0;
+    EI(ei_get_type(b, i, &etype, &atom_size));
+    if(etype == ERL_ATOM_EXT) {
+        char* atom = malloc(sizeof(char)*(atom_size+1));
+        EIC(ei_decode_atom(b, i, atom), free(atom));
+        if(is_false(atom)) {
+            *kb = 0;
+        } else if(is_true(atom)) {
+            *kb = 1;
+        }
+        free(atom);
+        return 0;
+    }
     EI(ei_decode_kg(b, i, kb, opts));
     return 0;
 }
@@ -640,8 +656,10 @@ int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts
            EI(ei_decode_kh(b, i, &kH(*k)[list_index], opts));
            break;
        case -KG: // byte
-       case -KB: // boolean
            EI(ei_decode_kg(b, i, &kG(*k)[list_index], opts));
+           break;
+       case -KB: // boolean
+           EI(ei_decode_kb(b, i, &kG(*k)[list_index], opts));
            break;
 
        case -KS: // symbol
@@ -767,6 +785,13 @@ int is_infinity(char* atom) {
 
 int is_null(char* atom) {
     return is_exact_atom(atom, "null");
+}
+int is_false(char* atom) {
+    return is_exact_atom(atom, "false");
+}
+
+int is_true(char* atom) {
+    return is_exact_atom(atom, "true");
 }
 
 int is_exact_atom(char* atom, const char* compare) {
