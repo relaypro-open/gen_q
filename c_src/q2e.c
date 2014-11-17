@@ -83,6 +83,7 @@ int ei_x_encode_k(ei_x_buff* x, K r, QOpts* opts) {
     EI(ei_x_new(&values));
     EIC(ei_x_encode_k_tv(types, &values, r, opts),
             ei_x_free(&values)); // cleanup expression
+    // TODO - JMS - is there a way to do this without deep copying data?
     EIC(ei_x_append(types, &values),
             ei_x_free(&values)); // cleanup expression
     EI(ei_x_free(&values));

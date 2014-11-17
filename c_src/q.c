@@ -75,12 +75,6 @@ void q_apply(QWorkApply* data, QOpts* opts) {
         LOG("kapply ei error - %s\n", "ei_decode_k");
         return;
     }
-    /*
-    if(!kdata) {
-        HANDLE_ERROR("e2q", 3);
-        LOG("kapply null kdata - %s\n", "e2q");
-        return;
-    }*/
 
     // -------------
     // handle kdata
@@ -94,7 +88,7 @@ void q_apply(QWorkApply* data, QOpts* opts) {
     if(r) {
         LOG("kapply received result with type %d\n", r->t);
     }
-    HANDLE_K_ERRNO(if(r) r0(r));
+    HANDLE_K_ERRNO(kx_guarded_decr_ref(r));
 
     if(data->handle < 0) {
         LOG("kapply asynchonous call, returning ok%s\n", "");
@@ -134,7 +128,6 @@ void q_apply(QWorkApply* data, QOpts* opts) {
 int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts) {
     EI(ei_x_new(&data->x));
     data->has_x = 1;
-    //EI(ei_x_encode_atom(&data->x, "ok"));
     EI(ei_x_encode_k(&data->x, r, opts));
     return 0;
 }

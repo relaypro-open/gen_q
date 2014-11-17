@@ -64,6 +64,7 @@ void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
     QWork *work = malloc(sizeof(QWork));
     work->op = -1;
     work->opts = 0;
+    work->data = NULL;
 
     int index = 0;
     ei_decode_version(buff, &index, &work->version);
@@ -117,6 +118,7 @@ int decode_op(char *buff, int* index, QWork *work) {
 
 int decode_op_opts(char* buff, int* index, QWork* work) {
     QOpts* data = malloc(sizeof(QOpts));
+    work->data = data;
 
     // init defaults
     data->unix_timestamp_is_q_datetime = 0;
@@ -145,7 +147,6 @@ int decode_op_opts(char* buff, int* index, QWork* work) {
 
     LOG("decode op opts utiqd=%d, dsiqt=%d\n", data->unix_timestamp_is_q_datetime, data->day_seconds_is_q_time);
 
-    work->data = data;
     return 0;
 }
 
