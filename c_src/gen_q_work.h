@@ -26,10 +26,10 @@ typedef struct {
 
 typedef struct {
     // input
-    char* host;
+    unsigned char* host;
     int hostlen;
     long port;
-    char* userpass;
+    unsigned char* userpass;
     int userpasslen;
     long timeout;
 
@@ -72,7 +72,7 @@ typedef struct {
     // input
     long handle;
     int funclen;
-    char* func;
+    unsigned char* func;
     int bufflen;
     char* buff;
     int types_index;

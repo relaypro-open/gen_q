@@ -111,7 +111,7 @@ int decode_op(char *buff, int* index, QWork *work) {
 
 #define ASSIGN_PROPERTY(key, prop)   \
     do {                             \
-        if(0==strcmp(#key,prop)) { \
+        if(0==strcmp(#key,(char*)prop)) { \
             data->key = 1;           \
         }                            \
     } while(0)
@@ -129,7 +129,7 @@ int decode_op_opts(char* buff, int* index, QWork* work) {
     LOG("decode op opts arity %d\n", arity);
     int i;
     for(i=0; i<arity; ++i) {
-        char* property = 0;
+        unsigned char* property = 0;
         int propertylen = 0;
         EI(ei_decode_alloc_string(buff, index, &property, &propertylen));
 
@@ -207,8 +207,8 @@ int decode_op_hclose(char *buff, int* index, QWork* work) {
     //
     // a list of a single int comes in as a string usually
     if(type == ERL_STRING_EXT) {
-        char argstr[HCLOSE_ARGV+1];
-        EI(ei_decode_string(buff, index, argstr));
+        unsigned char argstr[HCLOSE_ARGV+1];
+        EI(ei_decode_string_safe(buff, index, argstr));
         data->handle = argstr[0];
     } else if(type == ERL_LIST_EXT) {
         EI(ei_decode_list_header(buff, index, &arity));
@@ -293,8 +293,8 @@ int decode_op_hkill(char *buff, int* index, QWork* work) {
 
     // inputs
     if(type == ERL_STRING_EXT) {
-        char argstr[HKILL_ARGV+1];
-        EI(ei_decode_string(buff, index, argstr));
+        unsigned char argstr[HKILL_ARGV+1];
+        EI(ei_decode_string_safe(buff, index, argstr));
         data->handle = argstr[0];
     } else if(type == ERL_LIST_EXT) {
         EI(ei_decode_list_header(buff, index, &arity));

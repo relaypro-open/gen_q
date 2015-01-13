@@ -27,6 +27,10 @@ extern int ei_x_encode_error_tuple_string(ei_x_buff *buff, char *str);
 extern int ei_x_encode_error_tuple_atom_len(ei_x_buff *buff, char *atom, int atomlen);
 extern int ei_x_encode_error_tuple_string_len(ei_x_buff *buff, char *str, int strlen);
 
-extern int ei_decode_alloc_string(char *buff, int *index, char **str, int *len);
+extern int ei_decode_alloc_string(char *buff, int *index, unsigned char **str, int *len);
+
+extern int ei_decode_atom_safe(char *buff, int *index, unsigned char *a);
+extern int ei_decode_char_safe(char *buff, int *index, unsigned char *c);
+extern int ei_decode_string_safe(char *buff, int *index, unsigned char *p);
 
 #endif

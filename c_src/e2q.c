@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define STR_EQUAL(s0,s1) 0==strcmp(s0,s1)
+#define STR_EQUAL(s0,s1) 0==strcmp((char*)s0,(char*)s1)
 #define K_STR 25
 
 #define EI_NULL_OR_INFINITY(var, null_val, inf_val)          \
@@ -13,8 +13,8 @@
         int atom_size = 0;                                   \
         EI(ei_get_type(b, i, &etype, &atom_size));           \
         if(etype == ERL_ATOM_EXT) {                          \
-            char* atom = malloc(sizeof(char)*(atom_size+1)); \
-            EIC(ei_decode_atom(b, i, atom), free(atom));     \
+            unsigned char* atom = malloc(sizeof(unsigned char)*(atom_size+1)); \
+            EIC(ei_decode_atom_safe(b, i, atom), free(atom));     \
             if(is_null(atom)) {                              \
                 *var = null_val;                             \
             } else if(is_infinity(atom)) {                   \
@@ -30,7 +30,7 @@
     } while(0)
 
 // types
-int get_type_identifier_from_string(const char* str, int* type);
+int get_type_identifier_from_string(const unsigned char* str, int* type);
 int ei_get_k_type(char* buff, int* ti, int* type, int* size);
 int ei_get_k_type_from_atom(char* buff, int* ti, int atom_size, int* type);
 
@@ -52,15 +52,15 @@ int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts
 int ei_decode_table(char* b, int* ti, int* vi, K* k, QOpts* opts);
 int ei_decode_dict(char* b, int* ti, int* vi, K* k, QOpts* opts);
 int ei_decode_unknown(char* b, int* ti, int* vi, K* k, int ktype, QOpts* opts);
-int ei_assign_from_string(K* k, int ktype, int arity, char* v, QOpts* opts);
-int ei_assign_index_from_string(K* k, int ktype, int kindex, char* v, int vindex, QOpts* opts);
+int ei_assign_from_string(K* k, int ktype, int arity, unsigned char* v, QOpts* opts);
+int ei_assign_index_from_string(K* k, int ktype, int kindex, unsigned char* v, int vindex, QOpts* opts);
 
 // helpers
-int is_exact_atom(char* atom, const char* compare);
-int is_infinity(char* atom);
-int is_null(char* atom);
-int is_false(char* atom);
-int is_true(char* atom);
+int is_exact_atom(unsigned char* atom, const char* compare);
+int is_infinity(unsigned char* atom);
+int is_null(unsigned char* atom);
+int is_false(unsigned char* atom);
+int is_true(unsigned char* atom);
 void r02(K k1, K k2);
 void safe_deref_list(K k, int ktype, int j, int n);
 void safe_deref_list_and_free(K k, int ktype, int j, int n, void* f);
@@ -102,15 +102,15 @@ int ei_get_k_type(char* buff, int* ti, int* type, int* size) {
 }
 
 int ei_get_k_type_from_atom(char* buff, int* ti, int atom_size, int* type) {
-    char* atom = malloc(sizeof(char)*(atom_size+1));
+    unsigned char* atom = malloc(sizeof(unsigned char)*(atom_size+1));
     atom[atom_size] = '\0';
-    EIC(ei_decode_atom(buff, ti, atom), free(atom));
+    EIC(ei_decode_atom_safe(buff, ti, atom), free(atom));
     EIC(get_type_identifier_from_string(atom, type), free(atom));
     free(atom);
     return 0;
 }
 
-int get_type_identifier_from_string(const char* str, int *type) {
+int get_type_identifier_from_string(const unsigned char* str, int *type) {
     // Roughly ordered by probability of use
     // returns 0 for "list"
     // returns 101 for "ok"
@@ -266,7 +266,7 @@ int ei_decode_k(char *buff, int* types_index, int* values_index, K* k, QOpts* op
            break;
        case K_STR:
        {
-           char* s = NULL;
+           unsigned char* s = NULL;
            int len = 0;
            EI(ei_decode_alloc_string(buff, values_index, &s, &len));
            *k = ktn(KC, len);
@@ -305,10 +305,10 @@ int ei_decode_k(char *buff, int* types_index, int* values_index, K* k, QOpts* op
 
 // decoders
 int ei_decode_ks(char* b, int* i, K* k, QOpts* opts) {
-    char* s = NULL;
+    unsigned char* s = NULL;
     int len = 0;
     EI(ei_decode_alloc_string(b, i, &s, &len));
-    *k = ks(s);
+    *k = ks((char*)s);
     free(s);
     return 0;
 }
@@ -370,9 +370,9 @@ int ei_decode_ke(char* b, int* i, float* ke, QOpts* opts) {
 }
 
 int ei_decode_kc(char* b, int* i, unsigned char* kc, QOpts* opts) {
-    char c = 0;
-    EI(ei_decode_char(b, i, &c));
-    *kc = (unsigned char)c;
+    unsigned char c = 0;
+    EI(ei_decode_char_safe(b, i, &c));
+    *kc = c;
     return 0;
 }
 
@@ -388,8 +388,8 @@ int ei_decode_kb(char* b, int* i, unsigned char* kb, QOpts* opts) {
     int atom_size = 0;
     EI(ei_get_type(b, i, &etype, &atom_size));
     if(etype == ERL_ATOM_EXT) {
-        char* atom = malloc(sizeof(char)*(atom_size+1));
-        EIC(ei_decode_atom(b, i, atom), free(atom));
+        unsigned char* atom = malloc(sizeof(unsigned char)*(atom_size+1));
+        EIC(ei_decode_atom_safe(b, i, atom), free(atom));
         if(is_false(atom)) {
             *kb = 0;
         } else if(is_true(atom)) {
@@ -455,8 +455,8 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
                 return -1;
             }
 
-            char* s = malloc(sizeof(char)*(vsize+1));
-            EIC(ei_decode_string(b, vi, s), free(s));
+            unsigned char* s = malloc(sizeof(char)*(vsize+1));
+            EIC(ei_decode_string_safe(b, vi, s), free(s));
 
             *k = ktn(0, vsize);
             int list_index;
@@ -500,7 +500,7 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
     return -1;
 }
 
-int ei_assign_from_string(K* k, int ktype, int arity, char* v, QOpts* opts) {
+int ei_assign_from_string(K* k, int ktype, int arity, unsigned char* v, QOpts* opts) {
     *k = ktn(-ktype, arity);
     int list_index;
     if(ktype == -KT && opts->day_seconds_is_q_time) {
@@ -553,7 +553,7 @@ int ei_assign_from_string(K* k, int ktype, int arity, char* v, QOpts* opts) {
     return 0;
 }
 
-int ei_assign_index_from_string(K* k, int ktype, int kindex, char* v, int vindex, QOpts* opts) {
+int ei_assign_index_from_string(K* k, int ktype, int kindex, unsigned char* v, int vindex, QOpts* opts) {
     if(ktype == -KT && opts->day_seconds_is_q_time) {
         kK(*k)[kindex] = ki(sec_to_msec(v[vindex]));
         kK(*k)[kindex]->t = -KT;
@@ -607,9 +607,11 @@ int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts) {
     EI(ei_get_type(b, i, &type, &arity));
     if(type == ERL_STRING_EXT) {
         // erlang encodes some lists of integers as strings
+        //
+        // TODO - JMS - unicode strings... how do they work here?
 
-        char* v = malloc(sizeof(char)*(arity+1));
-        EIC(ei_decode_string(b, i, v), free(v));
+        unsigned char* v = malloc(sizeof(unsigned char)*(arity+1));
+        EIC(ei_decode_string_safe(b, i, v), free(v));
         EIC(ei_assign_from_string(k, ktype, arity, v, opts), free(v));
         free(v);
 
@@ -677,16 +679,16 @@ int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts
 
        case -KS: // symbol
        {
-           char* s = NULL;
+           unsigned char* s = NULL;
            int len = 0;
            EI(ei_decode_alloc_string(b, i, &s, &len));
-           kS(*k)[list_index] = ss(s);
+           kS(*k)[list_index] = ss((char*)s);
            free(s);
            break;
        }
        case K_STR:
        {
-           char* s = NULL;
+           unsigned char* s = NULL;
            int len = 0;
            EI(ei_decode_alloc_string(b, i, &s, &len));
            K kstr = ktn(KC, len);
@@ -807,23 +809,23 @@ int ei_decode_dict(char* b, int* ti, int* vi, K* k, QOpts* opts) {
 }
 
 // helpers
-int is_infinity(char* atom) {
+int is_infinity(unsigned char* atom) {
     return is_exact_atom(atom, "infinity");
 }
 
-int is_null(char* atom) {
+int is_null(unsigned char* atom) {
     return is_exact_atom(atom, "null");
 }
-int is_false(char* atom) {
+int is_false(unsigned char* atom) {
     return is_exact_atom(atom, "false");
 }
 
-int is_true(char* atom) {
+int is_true(unsigned char* atom) {
     return is_exact_atom(atom, "true");
 }
 
-int is_exact_atom(char* atom, const char* compare) {
-    int result = 0==strcmp(atom,compare);
+int is_exact_atom(unsigned char* atom, const char* compare) {
+    int result = 0==strcmp((char*)atom,(char*)compare);
     return result;
 }
 

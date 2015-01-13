@@ -12,7 +12,8 @@ gen_q_port_test_() ->
             fun setup/0,
             fun teardown/1,
             fun(#ctx{h=H}) ->
-                    [?_eqe(time, 43200000), % `int$12t
+                    [
+                     ?_eqe(time, 43200000), % `int$12t
                      ?_eqe(second, 45042), % `int$`second$12:30:42
                      ?_eqe(minute, 750), % `int$`minute$12:30:42
                      ?_eqe(timespan, 19647590000), % `long$2014.11.10D16:27:40.805091000-2014.11.10D16:27:21.157501000
@@ -164,7 +165,14 @@ gen_q_port_test_() ->
                      ?_eqe({list, short}, [null, infinity]),
 
                      % Undocumented types
-                     ?_eqe({projection, string, long, long}, {"{x+y+z}",1,2}) % type 104
+                     ?_eqe({projection, string, long, long}, {"{x+y+z}",1,2}), % type 104
+
+                     % Tests created for fixed bugs
+                     ?_eqe({list, long}, [200])  % There was a bug with decoding a value between 0-255
+                                                 % as a char (the ei API default for strings) and assigned
+                                                 % the signed value (-56) to the K long variable. None of
+                                                 % the previous tests attempted to decode integers between
+                                                 % 128-255.
                  ]
             end}.
 
@@ -173,9 +181,11 @@ gen_q_port_utiqd_test_() ->
             fun setup_utiqd/0,
             fun teardown/1,
             fun(#ctx{h=H}) ->
-                    [?_eqe(datetime, 1415630000),
+                    [
+                     ?_eqe(datetime, 1415630000),
                      ?_eqe_all_neighbor({list, datetime}, [1,2,3], 1.5),
-                     ?_eqe_all_neighbor({list, datetime}, [1000,2000,3000], 1.5)]
+                     ?_eqe_all_neighbor({list, datetime}, [1000,2000,3000], 1.5)
+                 ]
             end}.
 
 gen_q_port_dsiqt_test_() ->
@@ -183,9 +193,11 @@ gen_q_port_dsiqt_test_() ->
             fun setup_dsiqt/0,
             fun teardown/1,
             fun(#ctx{h=H}) ->
-                    [?_eqe(time, 43200),
+                    [
+                     ?_eqe(time, 43200),
                      ?_eqe({list, time}, [1,2,3]),
-                     ?_eqe({list, time}, [1000,2000,3000])]
+                     ?_eqe({list, time}, [1000,2000,3000])
+                 ]
             end}.
 
 setup() ->
