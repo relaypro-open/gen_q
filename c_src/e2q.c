@@ -607,8 +607,6 @@ int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts) {
     EI(ei_get_type(b, i, &type, &arity));
     if(type == ERL_STRING_EXT) {
         // erlang encodes some lists of integers as strings
-        //
-        // TODO - JMS - unicode strings... how do they work here?
 
         unsigned char* v = malloc(sizeof(unsigned char)*(arity+1));
         EIC(ei_decode_string_safe(b, i, v), free(v));
