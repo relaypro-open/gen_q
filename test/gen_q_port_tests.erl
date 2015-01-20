@@ -13,21 +13,32 @@ gen_q_port_test_() ->
             fun teardown/1,
             fun(#ctx{h=H}) ->
                     [
+                     % Exhaustive tests
+                     [ ?_eqe(month, X) || X <- lists:seq(0, 500) ], % 2000.01m -> 2041.09m
+                     [ ?_eqe(char, X) || X <- lists:seq(0, 255) ],
+
+                     % Removed to avoid long-running tests
+                     %?_eqe_value(short, -32768, null),
+                     %[ ?_eqe(short, X) || X <- lists:seq(-32767, 32766) ],
+                     %?_eqe_value(short, 32767, infinity),
+
+                     [ ?_eqe(byte, X) || X <- lists:seq(0, 255) ],
+                     [ ?_eqe({list, byte}, [X]) || X <- lists:seq(0, 255) ],
+                     [ ?_eqe_type({list, char}, string, [X]) || X <- lists:seq(0, 255) ],
+
+                     % Random selections
                      ?_eqe(time, 43200000), % `int$12t
                      ?_eqe(second, 45042), % `int$`second$12:30:42
                      ?_eqe(minute, 750), % `int$`minute$12:30:42
                      ?_eqe(timespan, 19647590000), % `long$2014.11.10D16:27:40.805091000-2014.11.10D16:27:21.157501000
                      ?_eqe_neighbor(datetime, 5427.693, ?floatEps), % `float$2014.11.10T16:38:04.679
                      ?_eqe(date, 5427), % `int$2014.11.10
-                     ?_eqe(month, 178), % `int$2014.11m
                      ?_eqe(integer, 2),
                      ?_eqe(timestamp, 468953337121125000), % `long$2014.11.10D16:48:57.121125000
                      ?_eqe(long, 2),
                      ?_eqe_neighbor(float, 0.456, ?floatEps),
-                     ?_eqe(char, $A),
                      ?_eqe_neighbor(real, 0.1, ?realEps),
-                     ?_eqe(short, 3),
-                     ?_eqe(byte, 255),
+                     ?_eqe(boolean, 0),
                      ?_eqe(boolean, 1),
                      ?_eqe_value(boolean, true, 1),
                      ?_eqe_value(boolean, false, 0),
@@ -43,6 +54,16 @@ gen_q_port_test_() ->
                      ?_eqe_all_neighbor({list, real}, [1.1, 2.2, 3.3], ?realEps),
                      ?_eqe_all_neighbor({list, real}, [5.5, 6.5, 7.5], ?floatEps),
                      ?_eqe({list, integer}, []),
+
+                     lists:map(fun(X) ->
+                                 ?_eqe({list, long}, [X])
+                         end, lists:seq(-300, 300)),
+                     lists:map(fun(X) ->
+                                 ?_eqe({list, integer}, [X])
+                         end, lists:seq(-300, 300)),
+                     lists:map(fun(X) ->
+                                 ?_eqe_all_neighbor({list, float}, [X], ?floatEps)
+                         end, lists:seq(-300, 300)),
 
                      % Test erlang encoding lists of small ints as strings:
                      ?_eqe({list, time}, [1,2,3]),
