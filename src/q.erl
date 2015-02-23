@@ -64,8 +64,15 @@ start_link(ServerName, Options) ->
             {error, Error}
     end.
 
+priv_dir() ->
+    filename:join(root_dir(), "priv").
+
+root_dir() ->
+    {file, File} = code:is_loaded(?APP),
+    filename:dirname(filename:dirname(File)).
+
 load_driver() ->
-    Dir = gen_q:priv_dir(),
+    Dir = priv_dir(),
     case erl_ddll:load(Dir, ?SharedLib) of
         ok ->
             ok;
