@@ -1,0 +1,49 @@
+#!/bin/bash
+
+Q=q
+WHICH=which
+OUT=test/test.config
+
+if [ -e "$OUT" ]
+then
+    exit 0
+fi
+
+get_q_alias() {
+    type $Q | \
+        awk -F'`' '{print $2}' | \
+        awk -F"\'" '{print $1}'
+}
+
+get_q() {
+    local q_alias="$(get_q_alias)"
+    if [ "x$q_alias" = "x" ]
+    then
+        echo "$Q"
+    else
+        echo $q_alias
+    fi
+}
+
+get_q_full_path() {
+    $WHICH "$(get_q)"
+}
+
+get_q_home() {
+    dirname $(get_q_full_path)
+}
+
+get_q_exec() {
+    find $(get_q_home)/* -name q
+}
+
+main() {
+    local q_home=$(get_q_home)
+    local q_exec=$(get_q_exec)
+    echo "{'QHOME', \"$q_home\"}." > $OUT
+    echo "{'Q', \"$q_exec\"}." >> $OUT
+}
+
+shopt -s expand_aliases
+source ~/.bashrc
+main

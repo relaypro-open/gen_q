@@ -1,12 +1,22 @@
 -module(test_q).
--compile([export_all]).
-% This is a pretty big kludge - it works within the unit test only!
+-export([start/0, stop/3]).
+
+config(App) ->
+    {ok, P} = file:consult(App ++ "/test/test.config"),
+    P.
 
 start() ->
+    App = filename:dirname(filename:dirname(code:which(?MODULE))),
     Pid = self(),
     Port = 5000,
+    Config = config(App),
+    QHome = proplists:get_value('QHOME', Config),
+    QExec = proplists:get_value('Q', Config),
     QPid = spawn(fun() ->
-                P5 = erlang:open_port({spawn, "/usr/bin/env QHOME=/Users/jstimpson/dev/q/q /Users/jstimpson/dev/q/q/m32/q /Users/jstimpson/dev/erlang/gen_q/test/test_q.q -p " ++ integer_to_list(Port)},
+                P5 = erlang:open_port({spawn, "/usr/bin/env QHOME=\""++QHome++
+                        "\" \""++QExec++"\" \""++App++"/test/test_q.q\" -p " ++ 
+                        integer_to_list(Port)},
+
                         [stderr_to_stdout, in, exit_status,
                             binary, stream, {line, 255}]),
                 loop(P5, Pid, list_to_binary(integer_to_list(Port)))

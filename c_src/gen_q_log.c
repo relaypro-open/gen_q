@@ -8,7 +8,7 @@ static FILE *fp = NULL;
 
 int open_log() {
 #if LOGGING_ENABLED
-    fp = fopen("/Users/jstimpson/dev/erlang/gen_q/.gen_q/log/gen_q_drv.log", "w");
+    fp = fopen("/tmp/gen_q_drv.log", "w");
 
     if( fp ) {
         return 0;

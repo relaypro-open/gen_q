@@ -46,7 +46,7 @@ void q_hopen(QWorkHOpen* data) {
     LOG("khpun %s %ld %s %ld\n", data->host, data->port, data->userpass, data->timeout);
 
     errno = 0;
-    data->handle = khpun(data->host, data->port, data->userpass, data->timeout);
+    data->handle = khpun((S)data->host, data->port, (S)data->userpass, data->timeout);
     HANDLE_K_ERRNO(/* No cleanup */);
 
     LOG("khpun result %d\n", data->handle);
@@ -84,7 +84,7 @@ void q_apply(QWorkApply* data, QOpts* opts) {
         LOG("kapply calling %s with (::)\n", data->func);
     }
     errno = 0;
-    K r = k(data->handle, data->func, kdata, (K)0);
+    K r = k(data->handle, (S)data->func, kdata, (K)0);
     if(r) {
         LOG("kapply received result with type %d\n", r->t);
     }
