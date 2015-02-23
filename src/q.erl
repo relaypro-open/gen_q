@@ -68,7 +68,7 @@ priv_dir() ->
     filename:join(root_dir(), "priv").
 
 root_dir() ->
-    {file, File} = code:is_loaded(?APP),
+    {file, File} = code:is_loaded(q),
     filename:dirname(filename:dirname(File)).
 
 load_driver() ->

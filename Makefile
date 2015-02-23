@@ -8,4 +8,4 @@ clean:
 
 test: all
 	@(test/configure)
-	@(./rebar eunit skip_deps=true)
+	@(./rebar eunit skip_deps=true suite=gen_q_port_tests)
