@@ -2,7 +2,7 @@
 -behavior(gen_server).
 
 %% External exports
--export([start/1, start/2, start_link/1, start_link/2, stop/0, stop/1]).
+-export([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2, stop/0, stop/1]).
 
 %% API functions
 -export([hopen/4, hopen/5,
@@ -36,6 +36,9 @@
 
 -record(state, {port, port_timeout}).
 
+start() ->
+    start([]).
+
 start(Options) ->
     start({local, ?MODULE}, Options).
 
@@ -52,6 +55,9 @@ stop() ->
 
 stop(SvrRef) ->
     gen_server:call(SvrRef, {stop}, infinity).
+
+start_link() ->
+    start_link([]).
 
 start_link(Options) ->
     start_link({local, ?MODULE}, Options).
