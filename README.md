@@ -15,7 +15,7 @@ Add the following to your Erlang app's `rebar.config`.
 ```Erlang
 {gen_q, ".*", {git, "git@github.com:republicwireless-open/gen_q.git", {tag, "1.0"}}}
 ```
-Before compliging, if your target q process is version 3 or higher, you must edit __gen_q__'s `rebar.config` and add `-DKXVER=3` to the CFLAGS. Then, compile and start your app.
+Before compiling, if your target q process is version 3 or higher, you must edit __gen_q__'s `rebar.config` and add `-DKXVER=3` to the CFLAGS. Then, compile and start your app.
 
 Start the port driver with the following command.
 ```Erlang
@@ -58,3 +58,13 @@ add `-DKXVER=3` to your `CFLAGS` in __gen_q__'s `rebar.config`.
 If you're compiling for __Darwin__ (Mac OS X), there are a couple caveats:
 * A 32bit version of `libgcc_s.1` is required. The `rebar.config` includes the path `/opt/local/lib/gcc48` in an attempt to locate the file. Edit as needed.
 * On Darwin, __gen_q__ does not compile within the rebar dependency tree. Change directory to `deps/gen_q` and run `make` from there.
+
+Development
+-----------
+Run the unit tests with
+```bash
+make test
+```
+Note that due to an unknown issue with port drivers running inside a rebar
+eunit task, rebar may SEGFAULT _after_ all the tests have run successfully.
+This is being tracked in the open issues.
