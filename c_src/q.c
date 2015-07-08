@@ -6,9 +6,11 @@
 #include "e2q.h"
 #include "q2e.h"
 #include "gen_q.h"
+#include <netinet/tcp.h>
 
 int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts);
 int ei_x_encode_decodebinary_result(QWorkDecodeBinary* data, K r, QOpts* opts);
+void configure_socket(QWorkHOpen* data);
 
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
@@ -54,6 +56,50 @@ void q_hopen(QWorkHOpen* data) {
     if(data->handle == 0) {
         HANDLE_ERROR("access", 6);
         return;
+    }
+
+    configure_socket(data);
+}
+
+void configure_socket(QWorkHOpen* data) {
+    int ensure_nodelay = 1;
+    if(ensure_nodelay) {
+
+        int nodelay_on = 0;
+        socklen_t opt_len = 0;
+        int sock_result = getsockopt(data->handle, IPPROTO_TCP, TCP_NODELAY, (char*)&nodelay_on, &opt_len);
+        HANDLE_K_ERRNO( kclose(data->handle) );
+
+        LOG("TCP_NODELAY getsockopt got %d, on==%d\n", sock_result, nodelay_on);
+
+        if(sock_result < 0) {
+            HANDLE_ERROR("nodelay-r", 9);
+            kclose(data->handle);
+            return;
+        }
+
+        if(!nodelay_on) {
+            nodelay_on = 1;
+            sock_result = setsockopt(data->handle, IPPROTO_TCP, TCP_NODELAY, (char*)&nodelay_on, sizeof(int));
+            HANDLE_K_ERRNO( kclose(data->handle) );
+
+            if(sock_result < 0) {
+                HANDLE_ERROR("nodelay-w", 9);
+                kclose(data->handle);
+                return;
+            }
+
+            int r = getsockopt(data->handle, IPPROTO_TCP, TCP_NODELAY, (char*)&nodelay_on, &opt_len);
+
+            LOG("TCP_NODELAY setsockopt got %d, on==%d\n", sock_result, nodelay_on);
+            sock_result = r;
+
+            if(sock_result < 0) {
+                HANDLE_ERROR("nodelay-c", 9);
+                kclose(data->handle);
+                return;
+            }
+        }
     }
 }
 

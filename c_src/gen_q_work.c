@@ -8,6 +8,8 @@
 #include "q.h"
 #include "e2q.h"
 #include <string.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
 
 /* ALLOC internal function declarations */
 int decode_op(char *buff, int* index, QWork *work);
@@ -455,6 +457,7 @@ int work_result_apply(QWorkApply* data, ei_x_buff *buff) {
     LOG("work result encode ok tuple %d\n", 0);
     EI(ei_x_encode_ok_tuple_header(buff));
     LOG("work result append data %d\n", 0);
+
     EI(ei_x_append(buff, &data->x));
     LOG("work result return %d\n", 0);
     return 0;
