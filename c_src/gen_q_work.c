@@ -67,6 +67,7 @@ void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
     work->op = -1;
     work->opts = 0;
     work->data = NULL;
+    work->dispatch_key = NULL;
 
     int index = 0;
     ei_decode_version(buff, &index, &work->version);
@@ -74,6 +75,23 @@ void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
     LOG("malloc work version %d\n", work->version);
 
     int arity = 0;
+    ei_decode_tuple_header(buff, &index, &arity);
+
+    {
+        int etype = 0;
+        int atom_size = 0;
+        ei_get_type(buff, &index, &etype, &atom_size);
+        if(etype == ERL_ATOM_EXT) {
+            ei_skip_term(buff, &index);
+        } else {
+            long dispatch_key = 0;
+            ei_decode_long(buff, &index, &dispatch_key);
+            work->dispatch_key = malloc(sizeof(unsigned int));
+            *(work->dispatch_key) = (unsigned int)dispatch_key;
+        }
+    }
+
+    arity = 0;
     ei_decode_tuple_header(buff, &index, &arity);
     LOG("malloc work arity %d\n", arity);
     if(arity != 2) {
@@ -488,6 +506,7 @@ void genq_free_work(void *w) {
     LOG("free qwork %d\n", 0);
     QWork* work = (QWork*)w;
     free_qwork_data(work->op, work->data);
+    free(work->dispatch_key);
     free(work);
 }
 

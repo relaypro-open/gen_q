@@ -56,7 +56,8 @@ static void gen_q_drv_output(ErlDrvData handle, char *buff,
         return;
     }
     work->opts = &d->opts;
-    driver_async(d->port, NULL,
+
+    driver_async(d->port, work->dispatch_key,
             genq_work,
             work,
             genq_free_work);

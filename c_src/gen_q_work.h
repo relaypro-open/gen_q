@@ -21,6 +21,7 @@ typedef struct {
     int version;
     long op;
     void* data;
+    unsigned int* dispatch_key;
     QOpts* opts;
 } QWork;
 

@@ -36,7 +36,7 @@
 
 -include("../include/gen_q.hrl").
 
--record(state, {port, port_timeout}).
+-record(state, {port, port_timeout, tid_start, tid_end, task_count=0}).
 
 start() ->
     start([]).
@@ -67,6 +67,16 @@ state(SvrRef) ->
 start_link() ->
     start_link([]).
 
+%%
+%% Options may contain {async_thread_start, AS} and {async_thread_end, AE}
+%% which, when defined, will bypass the erl driver's default behavior of round-robin
+%% to async threads. Each q gen_server will round robin within its own partition
+%% of async threads. Note! AS is inclusive, AE is exclusive.
+%%
+%% Overlapping async thread partitions is not recommended. Also note, any other port
+%% drivers will still use the default round robin, so this does not guarantee the q
+%% gen_server a dedicated thread. Only that there is not contention among q gen_servers
+%% 
 start_link(Options) ->
     start_link({local, ?MODULE}, Options).
 
@@ -165,11 +175,23 @@ init(Opts) ->
             (day_seconds_is_q_time) -> true;
             (_) -> false
         end, Opts),
-    send_async_port_command(Port, {?FuncOpts, Opts2}),
+    AsyncThreads = erlang:system_info(thread_pool_size),
+    TidStart = proplists:get_value(async_thread_start, Opts),
+    TidEnd = proplists:get_value(async_thread_end, Opts),
+    if
+        is_integer(TidEnd) andalso TidEnd > AsyncThreads ->
+            throw({bad_async_thread_assignment, {TidEnd, AsyncThreads}});
+        true ->
+            ok
+    end,
+    DispatchKey = undefined,
+    send_async_port_command(Port, {DispatchKey, {?FuncOpts, Opts2}}),
     case recv_async_port_result(Port, PortTimeout) of
         {reply, ok} ->
             {ok, #state{port=Port,
-                    port_timeout=PortTimeout}};
+                    port_timeout=PortTimeout,
+                    tid_start=TidStart,
+                    tid_end=TidEnd}};
         {stop, port_timeout} ->
             {stop, port_timeout}
     end.
@@ -189,14 +211,20 @@ handle_call({get_state}, _From, State) ->
 handle_call({stop}, _From, State) ->
     {stop, normal, State}.
 
-do_call(State=#state{port=Port, port_timeout=PortTimeout}, Msg) ->
-    send_async_port_command(Port, Msg),
+do_call(State=#state{port=Port, port_timeout=PortTimeout, task_count=TaskCount}, Msg) ->
+    DispatchKey = compute_dispatch_key(State),
+    send_async_port_command(Port, {DispatchKey, Msg}),
     case recv_async_port_result(Port, PortTimeout) of
         {reply, Reply} ->
-            {reply, Reply, State};
+            {reply, Reply, State#state{task_count=TaskCount+1}};
         {stop, port_timeout} ->
-            {stop, port_timeout, State}
+            {stop, port_timeout, State#state{task_count=TaskCount+1}}
     end.
+
+compute_dispatch_key(#state{tid_start=undefined}) -> undefined;
+compute_dispatch_key(#state{tid_end=undefined}) -> undefined;
+compute_dispatch_key(#state{tid_start=S, tid_end=E, task_count=C}) ->
+    S + C rem (E-S).
 
 send_async_port_command(Port, Msg) ->
     % Note: erlang:port_command is a synchronous call
