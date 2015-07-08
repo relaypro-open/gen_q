@@ -13,6 +13,8 @@
          dot/4, dot/5, dot/6,
          eval/2, eval/3, eval/4]).
 
+-export([state/0, state/1]).
+
 %% gen_server callbacks
 -export([init/1,
         handle_call/3,
@@ -55,6 +57,12 @@ stop() ->
 
 stop(SvrRef) ->
     gen_server:call(SvrRef, {stop}, infinity).
+
+state() ->
+    state(?MODULE).
+
+state(SvrRef) ->
+    gen_server:call(SvrRef, {get_state}, infinity).
 
 start_link() ->
     start_link([]).
@@ -176,6 +184,8 @@ handle_call({decode_binary, Binary}, _From, State) ->
     do_call(State, {?FuncQDecodeBinary, [Binary]});
 handle_call({apply, Handle, Func, Types, Values}, _From, State) ->
     do_call(State, {?FuncQApply, [Handle, Func, {Types, Values}]});
+handle_call({get_state}, _From, State) ->
+    {reply, State, State};
 handle_call({stop}, _From, State) ->
     {stop, normal, State}.
 
