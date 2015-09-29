@@ -1,4 +1,5 @@
 #include "q.h"
+#include "gen_q.h"
 #include "gen_q_log.h"
 #include "k.h"
 #include <string.h>
@@ -20,7 +21,7 @@ void configure_socket(QWorkHOpen* data);
             LOG("k unexpected error: errno=%d - %s\n", errno, ebuf);  \
         } else {                                                      \
             int elen = strlen(ebuf);                                  \
-            data->error = malloc((sizeof(char))*(elen+1));            \
+            data->error = genq_alloc((sizeof(char))*(elen+1));            \
             memcpy(data->error, ebuf, elen);                          \
             data->errorlen = elen;                                    \
             (data->error)[elen] = '\0';                               \
@@ -32,7 +33,7 @@ void configure_socket(QWorkHOpen* data);
 #define HANDLE_ERROR(errstr, errlen) \
     do { \
         data->errorlen = errlen; \
-        data->error = malloc((sizeof(char))*(data->errorlen+1)); \
+        data->error = genq_alloc((sizeof(char))*(data->errorlen+1)); \
         memcpy(data->error, errstr, data->errorlen); \
         data->error[data->errorlen] = '\0'; \
     } while(0)

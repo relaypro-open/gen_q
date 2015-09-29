@@ -91,7 +91,7 @@ extern void copy_qopts(QOpts* src, QOpts* dest);
 /**
  * ALLOC
  */
-extern void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen);
+extern void* genq_alloc_work(char *buff, ErlDrvSizeT bufflen);
 
 /**
  * DO WORK

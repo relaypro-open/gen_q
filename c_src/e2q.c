@@ -1,4 +1,5 @@
 #include "e2q.h"
+#include "gen_q.h"
 #include "ei_util.h"
 #include "gen_q_log.h"
 #include <stdlib.h>
@@ -13,18 +14,18 @@
         int atom_size = 0;                                   \
         EI(ei_get_type(b, i, &etype, &atom_size));           \
         if(etype == ERL_ATOM_EXT) {                          \
-            unsigned char* atom = malloc(sizeof(unsigned char)*(atom_size+1)); \
-            EIC(ei_decode_atom_safe(b, i, atom), free(atom));     \
+            unsigned char* atom = genq_alloc(sizeof(unsigned char)*(atom_size+1)); \
+            EIC(ei_decode_atom_safe(b, i, atom), genq_free(atom));     \
             if(is_null(atom)) {                              \
                 *var = null_val;                             \
             } else if(is_infinity(atom)) {                   \
                 *var = inf_val;                              \
             } else {                                         \
                 LOG("ERROR unknown atom %s\n", atom);        \
-                free(atom);                                  \
+                genq_free(atom);                                  \
                 return -1;                                   \
             }                                                \
-            free(atom);                                      \
+            genq_free(atom);                                      \
             return 0;                                        \
         }                                                    \
     } while(0)
@@ -102,11 +103,11 @@ int ei_get_k_type(char* buff, int* ti, int* type, int* size) {
 }
 
 int ei_get_k_type_from_atom(char* buff, int* ti, int atom_size, int* type) {
-    unsigned char* atom = malloc(sizeof(unsigned char)*(atom_size+1));
+    unsigned char* atom = genq_alloc(sizeof(unsigned char)*(atom_size+1));
     atom[atom_size] = '\0';
-    EIC(ei_decode_atom_safe(buff, ti, atom), free(atom));
-    EIC(get_type_identifier_from_string(atom, type), free(atom));
-    free(atom);
+    EIC(ei_decode_atom_safe(buff, ti, atom), genq_free(atom));
+    EIC(get_type_identifier_from_string(atom, type), genq_free(atom));
+    genq_free(atom);
     return 0;
 }
 
@@ -274,7 +275,7 @@ int ei_decode_k(char *buff, int* types_index, int* values_index, K* k, QOpts* op
            for(i=0; i<len; ++i) {
                kC(*k)[i] = s[i];
            }
-           free(s);
+           genq_free(s);
            break;
        }
        case 0:   // any list - this differs from normal q type checking
@@ -309,7 +310,7 @@ int ei_decode_ks(char* b, int* i, K* k, QOpts* opts) {
     int len = 0;
     EI(ei_decode_alloc_string(b, i, &s, &len));
     *k = ks((char*)s);
-    free(s);
+    genq_free(s);
     return 0;
 }
 
@@ -388,14 +389,14 @@ int ei_decode_kb(char* b, int* i, unsigned char* kb, QOpts* opts) {
     int atom_size = 0;
     EI(ei_get_type(b, i, &etype, &atom_size));
     if(etype == ERL_ATOM_EXT) {
-        unsigned char* atom = malloc(sizeof(unsigned char)*(atom_size+1));
-        EIC(ei_decode_atom_safe(b, i, atom), free(atom));
+        unsigned char* atom = genq_alloc(sizeof(unsigned char)*(atom_size+1));
+        EIC(ei_decode_atom_safe(b, i, atom), genq_free(atom));
         if(is_false(atom)) {
             *kb = 0;
         } else if(is_true(atom)) {
             *kb = 1;
         }
-        free(atom);
+        genq_free(atom);
         return 0;
     }
     EI(ei_decode_kg(b, i, kb, opts));
@@ -455,20 +456,20 @@ int ei_decode_general_list(char* b, int* ti, int* vi, K* k, QOpts* opts) {
                 return -1;
             }
 
-            unsigned char* s = malloc(sizeof(char)*(vsize+1));
-            EIC(ei_decode_string_safe(b, vi, s), free(s));
+            unsigned char* s = genq_alloc(sizeof(char)*(vsize+1));
+            EIC(ei_decode_string_safe(b, vi, s), genq_free(s));
 
             *k = ktn(0, vsize);
             int list_index;
             for(list_index=0; list_index < vsize; ++list_index) {
                 int ktype = 0;
                 int ktypesize = 0;
-                EIC(ei_get_k_type(b, ti, &ktype, &ktypesize), free(s));
+                EIC(ei_get_k_type(b, ti, &ktype, &ktypesize), genq_free(s));
                 EIC(ei_assign_index_from_string(k, ktype, list_index, s, list_index, opts),
                         safe_deref_list_and_free(*k, 0, list_index, vsize, s));
             }
 
-            free(s);
+            genq_free(s);
             return 0;
 
         } else if (vtype == ERL_LIST_EXT ||
@@ -608,10 +609,10 @@ int ei_decode_same_list(char* b, int* i, int ktype, K* k, QOpts* opts) {
     if(type == ERL_STRING_EXT) {
         // erlang encodes some lists of integers as strings
 
-        unsigned char* v = malloc(sizeof(unsigned char)*(arity+1));
-        EIC(ei_decode_string_safe(b, i, v), free(v));
-        EIC(ei_assign_from_string(k, ktype, arity, v, opts), free(v));
-        free(v);
+        unsigned char* v = genq_alloc(sizeof(unsigned char)*(arity+1));
+        EIC(ei_decode_string_safe(b, i, v), genq_free(v));
+        EIC(ei_assign_from_string(k, ktype, arity, v, opts), genq_free(v));
+        genq_free(v);
 
     } else {
 
@@ -681,7 +682,7 @@ int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts
            int len = 0;
            EI(ei_decode_alloc_string(b, i, &s, &len));
            kS(*k)[list_index] = ss((char*)s);
-           free(s);
+           genq_free(s);
            break;
        }
        case K_STR:
@@ -695,7 +696,7 @@ int ei_decode_and_assign(char* b, int* i, int ktype, K* k, int list_index, QOpts
                kC(kstr)[i] = s[i];
            }
            kK(*k)[list_index] = kstr;
-           free(s);
+           genq_free(s);
            break;
        }
        case 0:   // list
@@ -829,7 +830,7 @@ int is_exact_atom(unsigned char* atom, const char* compare) {
 
 void safe_deref_list_and_free(K k, int ktype, int j, int n, void* f) {
     safe_deref_list(k, ktype, j, n);
-    free(f);
+    genq_free(f);
 }
 
 void safe_deref_list(K k, int ktype, int j, int n) {

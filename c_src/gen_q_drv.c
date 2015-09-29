@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "erl_driver.h"
+#include "gen_q.h"
 #include "ei.h"
 #include "gen_q_work.h"
 #include "gen_q_log.h"
@@ -13,7 +13,7 @@ typedef struct {
 
 static ErlDrvData gen_q_drv_start(ErlDrvPort port, char* buff) {
     open_log();
-    GenQData* d = (GenQData*)driver_alloc(sizeof(GenQData));
+    GenQData* d = (GenQData*)genq_alloc(sizeof(GenQData));
     d->port = port;
     d->opts.unix_timestamp_is_q_datetime = 0;
     d->opts.day_seconds_is_q_time = 0;
@@ -24,7 +24,7 @@ static ErlDrvData gen_q_drv_start(ErlDrvPort port, char* buff) {
 }
 
 static void gen_q_drv_stop(ErlDrvData handle) {
-    driver_free((char*)handle);
+    genq_free((char*)handle);
     LOG("port stopped %d\n", 0);
     close_log();
 }
@@ -33,7 +33,7 @@ static void gen_q_drv_output(ErlDrvData handle, char *buff,
         ErlDrvSizeT bufflen) {
     GenQData *d = (GenQData*)handle;
 
-    QWork* work = genq_malloc_work(buff, bufflen);
+    QWork* work = genq_alloc_work(buff, bufflen);
     if(work->op == FUNC_OPTS) {
         LOG("received opts %ld\n", work->op);
         copy_qopts((QOpts*)work->data, &d->opts);

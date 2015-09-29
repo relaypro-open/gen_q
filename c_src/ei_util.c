@@ -1,4 +1,5 @@
 #include "ei_util.h"
+#include "gen_q.h"
 #include <stdlib.h>
 
 int ei_x_encode_ok(ei_x_buff *buff) {
@@ -47,7 +48,7 @@ int ei_x_encode_error_tuple_string_len(ei_x_buff *buff, char *str, int strlen) {
 }
 
 void free_alloc_string(unsigned char **str, int *len) {
-    free(*str);
+    genq_free(*str);
     *str = 0;
     *len = -1;
 }
@@ -56,7 +57,7 @@ int ei_decode_alloc_string(char *buff, int *index, unsigned char **str, int *len
     int type = 0;
     EI(ei_get_type(buff, index, &type, len));
     if(type == ERL_STRING_EXT) {
-        *str = malloc((sizeof(unsigned char))*(*len+1));
+        *str = genq_alloc((sizeof(unsigned char))*(*len+1));
         EIC(ei_decode_string_safe(buff, index, *str), free_alloc_string(str, len));
         return 0;
     } else if(type == ERL_LIST_EXT ||
@@ -64,7 +65,7 @@ int ei_decode_alloc_string(char *buff, int *index, unsigned char **str, int *len
         // String larger than 65535
         int arity = 0;
         EI(ei_decode_list_header(buff, index, &arity));
-        *str = malloc((sizeof(unsigned char))*(*len+1));
+        *str = genq_alloc((sizeof(unsigned char))*(*len+1));
         int i;
         for(i=0; i < *len; ++i) {
             EIC(ei_decode_char_safe(buff, index, &(*str)[i]), free_alloc_string(str, len));
@@ -76,12 +77,12 @@ int ei_decode_alloc_string(char *buff, int *index, unsigned char **str, int *len
 
         return 0;
     } else if(type == ERL_ATOM_EXT) {
-        *str = malloc(sizeof(unsigned char)*(*len+1));
+        *str = genq_alloc(sizeof(unsigned char)*(*len+1));
         (*str)[*len] = '\0';
         EIC(ei_decode_atom_safe(buff, index, *str), free_alloc_string(str, len));
         return 0;
     } else if(type == ERL_BINARY_EXT) {
-        *str = malloc(sizeof(unsigned char)*(*len+1));
+        *str = genq_alloc(sizeof(unsigned char)*(*len+1));
         (*str)[*len] = '\0';
         long llen = 0;
         EIC(ei_decode_binary(buff, index, *str, &llen), free_alloc_string(str, len));

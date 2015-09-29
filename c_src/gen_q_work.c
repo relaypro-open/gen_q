@@ -1,4 +1,5 @@
 #include "gen_q_work.h"
+#include "gen_q.h"
 #include <unistd.h>
 #include <stdio.h>
 #include "ei.h"
@@ -62,8 +63,8 @@ void copy_qopts(QOpts* src, QOpts* dest) {
 /**
  * ALLOC
  */
-void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
-    QWork *work = malloc(sizeof(QWork));
+void* genq_alloc_work(char *buff, ErlDrvSizeT bufflen) {
+    QWork *work = genq_alloc(sizeof(QWork));
     work->op = -1;
     work->opts = 0;
     work->data = NULL;
@@ -72,7 +73,7 @@ void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
     int index = 0;
     ei_decode_version(buff, &index, &work->version);
 
-    LOG("malloc work version %d\n", work->version);
+    LOG("alloc work version %d\n", work->version);
 
     int arity = 0;
     ei_decode_tuple_header(buff, &index, &arity);
@@ -86,20 +87,20 @@ void* genq_malloc_work(char *buff, ErlDrvSizeT bufflen) {
         } else {
             long dispatch_key = 0;
             ei_decode_long(buff, &index, &dispatch_key);
-            work->dispatch_key = malloc(sizeof(unsigned int));
+            work->dispatch_key = genq_alloc(sizeof(unsigned int));
             *(work->dispatch_key) = (unsigned int)dispatch_key;
         }
     }
 
     arity = 0;
     ei_decode_tuple_header(buff, &index, &arity);
-    LOG("malloc work arity %d\n", arity);
+    LOG("alloc work arity %d\n", arity);
     if(arity != 2) {
         return work;
     }
 
     ei_decode_long(buff, &index, &work->op);
-    LOG("malloc work op %ld\n", work->op);
+    LOG("alloc work op %ld\n", work->op);
 
     int res = decode_op(buff, &index, work);
     if(res < 0) {
@@ -137,7 +138,7 @@ int decode_op(char *buff, int* index, QWork *work) {
     } while(0)
 
 int decode_op_opts(char* buff, int* index, QWork* work) {
-    QOpts* data = malloc(sizeof(QOpts));
+    QOpts* data = genq_alloc(sizeof(QOpts));
     work->data = data;
 
     // init defaults
@@ -159,7 +160,7 @@ int decode_op_opts(char* buff, int* index, QWork* work) {
         ASSIGN_PROPERTY(unix_timestamp_is_q_datetime, property);
         ASSIGN_PROPERTY(day_seconds_is_q_time, property);
 
-        free(property);
+        genq_free(property);
     }
     if(arity > 0) {
         EI(ei_skip_term(buff, index)); // skip tail
@@ -171,7 +172,7 @@ int decode_op_opts(char* buff, int* index, QWork* work) {
 }
 
 int decode_op_hopen(char *buff, int* index, QWork* work) {
-    QWorkHOpen* data = malloc(sizeof(QWorkHOpen));
+    QWorkHOpen* data = genq_alloc(sizeof(QWorkHOpen));
     work->data = data;
 
     // init flags for safe frees
@@ -208,7 +209,7 @@ int decode_op_hopen(char *buff, int* index, QWork* work) {
 }
 
 int decode_op_hclose(char *buff, int* index, QWork* work) {
-    QWorkHClose* data = malloc(sizeof(QWorkHClose));
+    QWorkHClose* data = genq_alloc(sizeof(QWorkHClose));
     work->data = data;
 
     // init flags for safe frees
@@ -249,7 +250,7 @@ int decode_op_hclose(char *buff, int* index, QWork* work) {
 }
 
 int decode_op_apply(char *buff, int* index, QWork* work) {
-    QWorkApply* data = malloc(sizeof(QWorkApply));
+    QWorkApply* data = genq_alloc(sizeof(QWorkApply));
     work->data = data;
 
     // init flags for safe frees
@@ -280,7 +281,7 @@ int decode_op_apply(char *buff, int* index, QWork* work) {
     LOG("decode op apply values_index %d\n", values_index);
     data->bufflen = *index - types_index;
     LOG("decode op apply bufflen %d\n", data->bufflen);
-    data->buff = malloc((sizeof(char))*data->bufflen);
+    data->buff = genq_alloc((sizeof(char))*data->bufflen);
     memcpy(data->buff, buff+types_index, data->bufflen);
     data->types_index = 0;
     data->values_index = data->types_index + (values_index - types_index);
@@ -296,7 +297,7 @@ int decode_op_apply(char *buff, int* index, QWork* work) {
 }
 
 int decode_op_hkill(char *buff, int* index, QWork* work) {
-    QWorkHKill* data = malloc(sizeof(QWorkHKill));
+    QWorkHKill* data = genq_alloc(sizeof(QWorkHKill));
     work->data = data;
 
     // init flags for safe frees
@@ -335,7 +336,7 @@ int decode_op_hkill(char *buff, int* index, QWork* work) {
 }
 
 int decode_op_decodebinary(char *buff, int* index, QWork* work) {
-    QWorkDecodeBinary* data = malloc(sizeof(QWorkDecodeBinary));
+    QWorkDecodeBinary* data = genq_alloc(sizeof(QWorkDecodeBinary));
     work->data = data;
 
     // init flags for safe frees
@@ -506,8 +507,8 @@ void genq_free_work(void *w) {
     LOG("free qwork %d\n", 0);
     QWork* work = (QWork*)w;
     free_qwork_data(work->op, work->data);
-    free(work->dispatch_key);
-    free(work);
+    genq_free(work->dispatch_key);
+    genq_free(work);
 }
 
 void free_qwork_data(int op, void *data) {
@@ -538,44 +539,44 @@ void free_qwork_data(int op, void *data) {
 
 void free_qopts(QOpts* data) {
     if(!data) return;
-    free(data);
+    genq_free(data);
 }
 
 void free_qwork_hopen(QWorkHOpen *data) {
     if(!data) return;
     if(data->errorlen >= 0) {
         LOG("free qwork hopen - errorlen %d\n", data->errorlen);
-        free(data->error);
+        genq_free(data->error);
     }
     if(data->userpasslen >= 0) {
         LOG("free qwork hopen - userpasslen %d\n", data->userpasslen);
-        free(data->userpass);
+        genq_free(data->userpass);
     }
     if(data->hostlen >= 0) {
         LOG("free qwork hopen - hostlen %d\n", data->hostlen);
-        free(data->host);
+        genq_free(data->host);
     }
-    free(data);
+    genq_free(data);
 }
 
 void free_qwork_hclose(QWorkHClose *data) {
     if(!data) return;
     if(data->errorlen >= 0) {
         LOG("free qwork hclose - errorlen %d\n", data->errorlen);
-        free(data->error);
+        genq_free(data->error);
     }
-    free(data);
+    genq_free(data);
 }
 
 void free_qwork_apply(QWorkApply *data) {
     if(!data) return;
     if(data->funclen >= 0) {
         LOG("free qwork apply - funclen %d\n", data->funclen);
-        free(data->func);
+        genq_free(data->func);
     }
     if(data->bufflen >= 0) {
         LOG("free qwork apply - bufflen %d\n", data->bufflen);
-        free(data->buff);
+        genq_free(data->buff);
     }
     if(data->has_x) {
         LOG("free qwork apply - has_x %d\n", data->has_x);
@@ -583,19 +584,19 @@ void free_qwork_apply(QWorkApply *data) {
     }
     if(data->errorlen >= 0) {
         LOG("free qwork apply - errorlen %d\n", data->errorlen);
-        free(data->error);
+        genq_free(data->error);
     }
     LOG("free qwork apply - struct%s\n", "");
-    free(data);
+    genq_free(data);
 }
 
 void free_qwork_hkill(QWorkHKill* data) {
     if(!data) return;
     if(data->errorlen >= 0) {
         LOG("free qwork hkill - errorlen %d\n", data->errorlen);
-        free(data->error);
+        genq_free(data->error);
     }
-    free(data);
+    genq_free(data);
 }
 
 void free_qwork_decodebinary(QWorkDecodeBinary* data) {
@@ -604,10 +605,10 @@ void free_qwork_decodebinary(QWorkDecodeBinary* data) {
         r0(data->binary);
     }
     if(data->errorlen >= 0) {
-        free(data->error);
+        genq_free(data->error);
     }
     if(data->has_x) {
         ei_x_free(&data->x);
     }
-    free(data);
+    genq_free(data);
 }
