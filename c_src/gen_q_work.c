@@ -20,6 +20,7 @@ int decode_op_hclose(char *buff, int *index, QWork *work);
 int decode_op_apply(char *buff, int *index, QWork *work);
 int decode_op_hkill(char *buff, int *index, QWork *work);
 int decode_op_decodebinary(char *buff, int *index, QWork *work);
+int decode_op_dbop(char *buff, int *index, QWork *work);
 
 /* DO WORK internal function declarations */
 void work_hopen(QWorkHOpen* data);
@@ -34,6 +35,7 @@ int work_result_hclose(QWorkHClose* data, ei_x_buff *buff);
 int work_result_apply(QWorkApply* data, ei_x_buff *buff);
 int work_result_hkill(QWorkHKill* data, ei_x_buff *buff);
 int work_result_decodebinary(QWorkDecodeBinary* data, ei_x_buff *buff);
+int work_result_dbop(QWorkDbOp* data, ei_x_buff *buff);
 
 /* FREE internal function declarations */
 void free_qopts(QOpts* data);
@@ -43,6 +45,7 @@ void free_qwork_hclose(QWorkHClose *data);
 void free_qwork_apply(QWorkApply *data);
 void free_qwork_hkill(QWorkHKill* data);
 void free_qwork_decodebinary(QWorkDecodeBinary* data);
+void free_qwork_dbop(QWorkDbOp* data);
 
 #define HANDLE_DATA_ERROR                           \
     if(data == NULL) {                              \
@@ -126,6 +129,12 @@ int decode_op(char *buff, int* index, QWork *work) {
             return decode_op_hkill(buff, index, work);
         case FUNC_Q_DECODE_BINARY:
             return decode_op_decodebinary(buff, index, work);
+        case FUNC_Q_DBOPEN:
+            return decode_op_dbop(buff, index, work);
+        case FUNC_Q_DBNEXT:
+            return decode_op_dbop(buff, index, work);
+        case FUNC_Q_DBCLOSE:
+            return decode_op_dbop(buff, index, work);
     }
     return -1;
 }
@@ -376,6 +385,49 @@ int decode_op_decodebinary(char *buff, int* index, QWork* work) {
     return 0;
 }
 
+int decode_op_dbop(char *buff, int* index, QWork* work) {
+    QWorkDbOp* data = genq_alloc(sizeof(QWorkDbOp));
+    work->data = data;
+
+    // init flags for safe frees
+    data->bufflen = -1;
+    data->has_x = 0;
+    data->errorlen = -1;
+
+    int arity = 0;
+    EI(ei_decode_list_header(buff, index, &arity));
+    LOG("decode op dbop arity %d\n", arity);
+    if(arity != 2) {
+        return -1;
+    }
+
+    EI(ei_decode_long(buff, index, &data->n));
+
+    // inputs
+    int types_index = 0;
+    int values_index = 0;
+    EI(ei_decode_types_values_tuple(buff, index,
+                &types_index, &values_index));
+    LOG("decode op dbop types_index %d\n", types_index);
+    LOG("decode op dbop values_index %d\n", values_index);
+    data->bufflen = *index - types_index;
+    LOG("decode op apply bufflen %d\n", data->bufflen);
+    data->buff = genq_alloc((sizeof(char))*data->bufflen);
+    memcpy(data->buff, buff+types_index, data->bufflen);
+    data->types_index = 0;
+    data->values_index = data->types_index + (values_index - types_index);
+
+    if(arity > 0) {
+        EI(ei_skip_term(buff, index)); // skip tail
+    }
+
+    // outputs
+    data->error = NULL;
+
+    return 0;
+
+}
+
 /**
  * DO WORK
  */
@@ -399,6 +451,15 @@ void genq_work(void *w) {
             break;
         case FUNC_Q_DECODE_BINARY:
             work_decodebinary((QWorkDecodeBinary*)work->data, work->opts);
+            break;
+        case FUNC_Q_DBOPEN:
+            q_dbopen((QWorkDbOp*)work->data, work->opts);
+            break;
+        case FUNC_Q_DBNEXT:
+            q_dbnext((QWorkDbOp*)work->data, work->opts);
+            break;
+        case FUNC_Q_DBCLOSE:
+            q_dbclose((QWorkDbOp*)work->data, work->opts);
             break;
     }
 }
@@ -442,6 +503,12 @@ int genq_work_result(void *w, ei_x_buff *buff) {
             return work_result_hkill((QWorkHKill*)work->data, buff);
         case FUNC_Q_DECODE_BINARY:
             return work_result_decodebinary((QWorkDecodeBinary*)work->data, buff);
+        case FUNC_Q_DBOPEN:
+            return work_result_dbop((QWorkDbOp*)work->data, buff);
+        case FUNC_Q_DBNEXT:
+            return work_result_dbop((QWorkDbOp*)work->data, buff);
+        case FUNC_Q_DBCLOSE:
+            return work_result_dbop((QWorkDbOp*)work->data, buff);
     }
     return -1;
 }
@@ -500,6 +567,23 @@ int work_result_decodebinary(QWorkDecodeBinary* data, ei_x_buff* buff) {
     return 0;
 }
 
+int work_result_dbop(QWorkDbOp *data, ei_x_buff* buff) {
+    LOG("work result dbop %d\n", 0);
+    HANDLE_DATA_ERROR;
+    if(!data->has_x) {
+        LOG("work result no data %d\n", 0);
+        EI(ei_x_encode_error_tuple_string(buff, "No data"));
+        return 0;
+    }
+    LOG("work result encode ok tuple %d\n", 0);
+    EI(ei_x_encode_ok_tuple_header(buff));
+    LOG("work result append data %d\n", 0);
+
+    EI(ei_x_append(buff, &data->x));
+    LOG("work result return %d\n", 0);
+    return 0;
+}
+
 /**
  * FREE
  */
@@ -534,6 +618,19 @@ void free_qwork_data(int op, void *data) {
             LOG("free qwork hkill %d\n", 0);
             free_qwork_hkill((QWorkHKill*)data);
             break;
+        case FUNC_Q_DBOPEN:
+            LOG("free qwork dbopen %d\n", 0);
+            free_qwork_dbop((QWorkDbOp*)data);
+            break;
+        case FUNC_Q_DBNEXT:
+            LOG("free qwork dbnext %d\n", 0);
+            free_qwork_dbop((QWorkDbOp*)data);
+            break;
+        case FUNC_Q_DBCLOSE:
+            LOG("free qwork dbclose %d\n", 0);
+            free_qwork_dbop((QWorkDbOp*)data);
+            break;
+
     }
 }
 
@@ -612,3 +709,18 @@ void free_qwork_decodebinary(QWorkDecodeBinary* data) {
     }
     genq_free(data);
 }
+
+void free_qwork_dbop(QWorkDbOp *data) {
+    if(!data) return;
+    if(data->has_x) {
+        LOG("free qwork dbop - has_x %d\n", data->has_x);
+        ei_x_free(&data->x);
+    }
+    if(data->errorlen >= 0) {
+        LOG("free qwork dbop - errorlen %d\n", data->errorlen);
+        genq_free(data->error);
+    }
+    LOG("free qwork apply - struct%s\n", "");
+    genq_free(data);
+}
+

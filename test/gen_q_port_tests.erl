@@ -240,3 +240,21 @@ teardown(#ctx{qpid=Q, port=P, h=H}) ->
     test_q:stop(Q, P, H),
     %% Note: Stopping the port causes *rebar* to segfault for some reason
     catch q:stop().
+
+gen_q_db_op_test_() ->
+    {setup,
+     fun setup_db_op/0,
+     fun teardown_db_op/1,
+     fun(_) ->
+             [
+              %?_assertMatch(ok, q:dbopen(ok)),
+              %?_assertMatch(ok, q:dbnext(ok, ok)),
+              %?_assertMatch(ok, q:dbclose(ok))
+             ]
+     end}.
+
+setup_db_op() ->
+    ok.
+
+teardown_db_op(_) ->
+    ok.

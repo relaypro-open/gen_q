@@ -11,6 +11,9 @@
 #define FUNC_Q_APPLY 3
 #define FUNC_Q_H_KILL 4
 #define FUNC_Q_DECODE_BINARY 5
+#define FUNC_Q_DBOPEN 6
+#define FUNC_Q_DBNEXT 7
+#define FUNC_Q_DBCLOSE 8
 
 typedef struct {
     int unix_timestamp_is_q_datetime;
@@ -85,6 +88,21 @@ typedef struct {
     int has_x;
     ei_x_buff x;
 } QWorkApply;
+
+typedef struct {
+    // input
+    long n;
+    int bufflen;
+    char* buff;
+    int types_index;
+    int values_index;
+
+    // output
+    int errorlen;
+    char* error;
+    int has_x;
+    ei_x_buff x;
+} QWorkDbOp;
 
 extern void copy_qopts(QOpts* src, QOpts* dest);
 

@@ -15,6 +15,8 @@
 
 -export([state/0, state/1]).
 
+-export([dbopen/1, dbnext/2, dbclose/1]).
+
 %% gen_server callbacks
 -export([init/1,
         handle_call/3,
@@ -31,6 +33,9 @@
 -define(FuncQApply, 3).
 -define(FuncQHKill, 4).
 -define(FuncQDecodeBinary, 5).
+-define(FuncQDbOpen, 6).
+-define(FuncQDbNext, 7).
+-define(FuncQDbClose, 8).
 
 -define(PortTimeout, 600000).
 
@@ -167,6 +172,18 @@ eval(SvrRef, Handle, Expr) ->
 eval(SvrRef, Handle, Expr, Timeout) ->
     apply(SvrRef, Handle, Expr, ok, ok, Timeout).
 
+dbopen(State) -> dbopen(?MODULE, State).
+dbopen(SvrRef, State) ->
+    gen_server:call(SvrRef, {dbopen, State}, infinity).
+
+dbnext(N, State) -> dbnext(?MODULE, N, State).
+dbnext(SvrRef, N, State) ->
+    gen_server:call(SvrRef, {dbnext, N, State}, infinity).
+
+dbclose(State) -> dbclose(?MODULE, State).
+dbclose(SvrRef, State) ->
+    gen_server:call(SvrRef, {dbclose, State}, infinity).
+
 init(Opts) ->
     process_flag(trap_exit, true),
     Port = open_port({spawn, ?SharedLib}, [binary]),
@@ -206,6 +223,12 @@ handle_call({decode_binary, Binary}, _From, State) ->
     do_call(State, {?FuncQDecodeBinary, [Binary]});
 handle_call({apply, Handle, Func, Types, Values}, _From, State) ->
     do_call(State, {?FuncQApply, [Handle, Func, {Types, Values}]});
+handle_call({dbopen, DbState}, _From, State) ->
+    do_call(State, {?FuncQDbOpen, [0, DbState]});
+handle_call({dbnext, N, DbState}, _From, State) ->
+    do_call(State, {?FuncQDbNext, [N, DbState]});
+handle_call({dbclose, DbState}, _From, State) ->
+    do_call(State, {?FuncQDbClose, [0, DbState]});
 handle_call({get_state}, _From, State) ->
     {reply, State, State};
 handle_call({stop}, _From, State) ->

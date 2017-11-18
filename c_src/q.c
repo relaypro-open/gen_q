@@ -211,3 +211,13 @@ int ei_x_encode_decodebinary_result(QWorkDecodeBinary* data, K r, QOpts* opts) {
     EI(ei_x_encode_k(&data->x, r, opts));
     return 0;
 }
+
+void q_dbopen(QWorkDbOp* data, QOpts* opts){
+    HANDLE_ERROR("access", 6);
+}
+void q_dbnext(QWorkDbOp* data, QOpts* opts){
+    HANDLE_ERROR("access", 6);
+}
+void q_dbclose(QWorkDbOp* data, QOpts* opts){
+    HANDLE_ERROR("access", 6);
+}
