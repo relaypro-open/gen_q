@@ -98,6 +98,7 @@ typedef struct {
     int values_index;
 
     // output
+    long handle;
     int errorlen;
     char* error;
     int has_x;

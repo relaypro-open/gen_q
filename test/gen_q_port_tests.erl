@@ -7,7 +7,7 @@
 
 -record(ctx, {qpid, port, h}).
 
-gen_q_port_test_() ->
+gen_q_port_test_no() ->
     {setup,
             fun setup/0,
             fun teardown/1,
@@ -197,7 +197,7 @@ gen_q_port_test_() ->
                  ]
             end}.
 
-gen_q_port_utiqd_test_() ->
+gen_q_port_utiqd_test_no() ->
     {setup,
             fun setup_utiqd/0,
             fun teardown/1,
@@ -209,7 +209,7 @@ gen_q_port_utiqd_test_() ->
                  ]
             end}.
 
-gen_q_port_dsiqt_test_() ->
+gen_q_port_dsiqt_test_no() ->
     {setup,
             fun setup_dsiqt/0,
             fun teardown/1,
@@ -247,14 +247,21 @@ gen_q_db_op_test_() ->
      fun teardown_db_op/1,
      fun(_) ->
              [
-              %?_assertMatch(ok, q:dbopen(ok)),
-              %?_assertMatch(ok, q:dbnext(ok, ok)),
-              %?_assertMatch(ok, q:dbclose(ok))
+              fun() ->
+                      {ok, Bytes} = file:read_file("/mnt/data/kdb/hdb_date/sym"),
+                      ok = q:decode_binary(Bytes),
+                      {ok, H, {symbol, ok}} = q:dbopen("/mnt/data/kdb/hdb_date",
+                                                    "2017.11.01", "icdr"),
+                      {error, "access"} = q:dbnext(H, {long, 0}),
+                      {ok, 0, {symbol, ok}} = q:dbclose(H)
+              end
              ]
      end}.
 
 setup_db_op() ->
-    ok.
+    Opts = [],
+    {ok, P} = q:start(Opts),
+    #ctx{port=P}.
 
 teardown_db_op(_) ->
-    ok.
+    catch q:stop().

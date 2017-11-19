@@ -9,8 +9,12 @@ int ei_x_encode_ok(ei_x_buff *buff) {
 }
 
 int ei_x_encode_ok_tuple_header(ei_x_buff *buff) {
+    return ei_x_encode_ok_tuple_header_n(buff, 2);
+}
+
+int ei_x_encode_ok_tuple_header_n(ei_x_buff *buff, int n) {
     EI(ei_x_encode_version(buff));
-    EI(ei_x_encode_tuple_header(buff, 2));
+    EI(ei_x_encode_tuple_header(buff, n));
     EI(ei_x_encode_atom(buff, "ok"));
     return 0;
 }

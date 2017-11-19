@@ -393,6 +393,7 @@ int decode_op_dbop(char *buff, int* index, QWork* work) {
     data->bufflen = -1;
     data->has_x = 0;
     data->errorlen = -1;
+    data->handle = 0;
 
     int arity = 0;
     EI(ei_decode_list_header(buff, index, &arity));
@@ -576,9 +577,10 @@ int work_result_dbop(QWorkDbOp *data, ei_x_buff* buff) {
         return 0;
     }
     LOG("work result encode ok tuple %d\n", 0);
-    EI(ei_x_encode_ok_tuple_header(buff));
+    EI(ei_x_encode_ok_tuple_header_n(buff, 3));
     LOG("work result append data %d\n", 0);
 
+    EI(ei_x_encode_long(buff, data->handle));
     EI(ei_x_append(buff, &data->x));
     LOG("work result return %d\n", 0);
     return 0;

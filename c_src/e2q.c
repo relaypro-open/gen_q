@@ -170,7 +170,8 @@ int get_type_identifier_from_string(const unsigned char* str, int *type) {
     return 0;
 }
 
-int ei_decode_types_values_tuple(char *buff, int *index, int *types_index, int *values_index) {
+int ei_decode_types_values_tuple(char *buff, int *index, int *types_index,
+        int *values_index) {
     int arity = 0;
     EI(ei_decode_tuple_header(buff, index, &arity));
     if(arity != 2) {
