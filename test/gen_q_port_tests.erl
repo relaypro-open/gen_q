@@ -248,12 +248,24 @@ gen_q_db_op_test_() ->
      fun(_) ->
              [
               fun() ->
-                      {ok, Bytes} = file:read_file("/mnt/data/kdb/hdb_date/sym"),
-                      ok = q:decode_binary(Bytes),
-                      {ok, H, {symbol, ok}} = q:dbopen("/mnt/data/kdb/hdb_date",
+                      {ok, H1, {symbol, ok}} = q:dbopen("/mnt/data/kdb/hdb_date",
+                                                    "2014.04.22", "cdr"),
+                      {ok, 0, [_]} = q:dbnext(H1, 1),
+                      {ok, 0, {symbol, ok}} = q:dbclose(H1),
+
+                      {ok, H2, {symbol, ok}} = q:dbopen("/mnt/data/kdb/hdb_date",
                                                     "2017.11.01", "icdr"),
-                      {error, "access"} = q:dbnext(H, {long, 0}),
-                      {ok, 0, {symbol, ok}} = q:dbclose(H)
+                      {ok, 0, List1} = q:dbnext(H2, 100),
+                      {ok, 0, List2} = q:dbnext(H2, 100),
+                      {ok, 0, List3} = q:dbnext(H2, 100),
+                      {ok, 0, List4} = q:dbnext(H2, 100),
+                      {ok, 0, List5} = q:dbnext(H2, 100),
+                      {ok, 0, List6} = q:dbnext(H2, 100),
+                      {ok, 0, List7} = q:dbnext(H2, 100),
+                      662 = lists:sum([ length(X) || X <- [List1, List2, List3,
+                                                           List4, List5, List6,
+                                                           List7] ]),
+                      {ok, 0, {symbol, ok}} = q:dbclose(H2)
               end
              ]
      end}.

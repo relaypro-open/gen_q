@@ -176,9 +176,9 @@ dbopen(Db, Part, Table) -> dbopen(?MODULE, Db, Part, Table).
 dbopen(SvrRef, Db, Part, Table) ->
     gen_server:call(SvrRef, {dbopen, Db, Part, Table}, infinity).
 
-dbnext(N, State) -> dbnext(?MODULE, N, State).
-dbnext(SvrRef, N, State) ->
-    gen_server:call(SvrRef, {dbnext, N, State}, infinity).
+dbnext(State, N) -> dbnext(?MODULE, State, N).
+dbnext(SvrRef, State, N) ->
+    gen_server:call(SvrRef, {dbnext, State, N}, infinity).
 
 dbclose(State) -> dbclose(?MODULE, State).
 dbclose(SvrRef, State) ->
@@ -228,7 +228,7 @@ handle_call({dbopen, Db, Part, Table}, _From, State) ->
     case file:list_dir(DbPartPath) of
         {ok, Columns0} ->
             % Remove .d file
-            Columns = lists:filter(fun(".d") -> false;
+            Columns = lists:filter(fun(".d"++_) -> false;
                                       (_) -> true end, Columns0),
 
             % Find columns with string data
@@ -242,7 +242,7 @@ handle_call({dbopen, Db, Part, Table}, _From, State) ->
             StringOffsetColumns = [ lists:sublist(X, 1, length(X)-1) || X <- StringDataColumns ],
 
             % Find remaining columns with easy types
-            TypedColumns = Columns -- StringDataColumns -- StringOffsetColumns,
+            TypedColumns = (Columns -- StringDataColumns) -- StringOffsetColumns,
 
             SymFile = filename:join([Db, sym]),
 
@@ -250,6 +250,7 @@ handle_call({dbopen, Db, Part, Table}, _From, State) ->
             ColumnDataC = [list_to_atom(X) || X <- (lists:duplicate(length(TypedColumns),
                                                SymFile) ++
                                [ filename:join([DbPartPath, X]) || X <- StringDataColumns])],
+            ColumnNameC = [list_to_atom(X) || X <- TypedColumns ++ StringOffsetColumns],
             FileHandleC = lists:duplicate(length(FilenameC), -1),
             DataHandleC = lists:duplicate(length(ColumnDataC), -1),
             ColumnTypeC = lists:duplicate(length(FilenameC), -1),
@@ -260,19 +261,20 @@ handle_call({dbopen, Db, Part, Table}, _From, State) ->
                      {list, long},
                      {list, long},
                      {list, long},
-                     {list, long}]}},
+                     {list, long},
+                     {list, symbol}]}},
             TableContent = {[filename, column_data, file_handle, data_handle,
-                      column_type, file_pos],
+                      column_type, file_pos, column_name],
                      [FilenameC, ColumnDataC, FileHandleC, DataHandleC,
-                      ColumnTypeC, FilePosC]},
+                      ColumnTypeC, FilePosC, ColumnNameC]},
             DbState = {TableMeta, TableContent},
 
             do_call(State, {?FuncQDbOpen, [0, DbState]});
         Error ->
             {reply, Error, State}
     end;
-handle_call({dbnext, N, DbState}, _From, State) ->
-    do_call(State, {?FuncQDbNext, [N, DbState]});
+handle_call({dbnext, DbState, N}, _From, State) ->
+    do_call(State, {?FuncQDbNext, [DbState, {long, N}]});
 handle_call({dbclose, DbState}, _From, State) ->
     do_call(State, {?FuncQDbClose, [DbState, {long, 0}]});
 handle_call({get_state}, _From, State) ->

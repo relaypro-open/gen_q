@@ -73,6 +73,10 @@ int ei_x_encode_dict(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 // helpers
 int msec_to_sec(int s);
 long long datetime_to_unix_timestamp(double d);
+long long datetime_to_unix_micros(double d);
+void timestamp_to_now(long long t, long* mega, long* sec, long* micro);
+void datetime_to_now(double d, long* mega, long* sec, long* micro);
+void unix_micros_to_now(long long t, long* mega, long* sec, long* micro);
 
 int ei_x_encode_general_list(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 
@@ -490,4 +494,55 @@ int msec_to_sec(int s) {
 
 long long datetime_to_unix_timestamp(double d) {
     return (long long)((d+10957)*8.64e4);
+}
+
+long long datetime_to_unix_micros(double d) {
+    return (long long)((d+10957)*8.64e10);
+}
+
+int ei_x_encode_datetime_as_now(ei_x_buff* values, double f) {
+    EI_X_ENCODE_NULL_OR_INF(f, nf, wf);
+
+    long mega = 0, sec = 0, micro = 0;
+    datetime_to_now(f, &mega, &sec, &micro);
+    EI(ei_x_encode_tuple_header(values, 3));
+    EI(ei_x_encode_longlong(values, mega));
+    EI(ei_x_encode_longlong(values, sec));
+    EI(ei_x_encode_longlong(values, micro));
+    return 0;
+}
+
+int ei_x_encode_timestamp_as_now(ei_x_buff* values, long long j) {
+    EI_X_ENCODE_NULL_OR_INF(j, nj, wj);
+
+    long mega = 0, sec = 0, micro = 0;
+    timestamp_to_now(j, &mega, &sec, &micro);
+    EI(ei_x_encode_tuple_header(values, 3));
+    EI(ei_x_encode_longlong(values, mega));
+    EI(ei_x_encode_longlong(values, sec));
+    EI(ei_x_encode_longlong(values, micro));
+    return 0;
+}
+
+void timestamp_to_now(long long t, long* mega, long* sec, long* micro) {
+    t = (t + 946684800000000000L) / 1000L;
+    unix_micros_to_now(t, mega, sec, micro);
+}
+
+void datetime_to_now(double d, long* mega, long* sec, long* micro) {
+    long long unix_micros = datetime_to_unix_micros(d);
+    unix_micros_to_now(unix_micros, mega, sec, micro);
+}
+
+void unix_micros_to_now(long long t, long* mega, long* sec, long* micro) {
+    if (mega == 0 ||
+            sec == 0 ||
+            micro == 0) {
+        return;
+    }
+    (*micro) = t;
+    (*mega) = (*micro) / (1000L*1000L*1000L*1000L);
+    (*micro) = (*micro) % (1000L*1000L*1000L*1000L);
+    (*sec) = (*micro) / (1000L*1000L);
+    (*micro) = (*micro) % (1000L*1000L);
 }

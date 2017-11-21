@@ -403,6 +403,7 @@ int decode_op_dbop(char *buff, int* index, QWork* work) {
     }
 
     EI(ei_decode_long(buff, index, &data->n));
+    LOG("decode op db op n %ld\n", data->n);
 
     // inputs
     int types_index = 0;
@@ -412,7 +413,7 @@ int decode_op_dbop(char *buff, int* index, QWork* work) {
     LOG("decode op dbop types_index %d\n", types_index);
     LOG("decode op dbop values_index %d\n", values_index);
     data->bufflen = *index - types_index;
-    LOG("decode op apply bufflen %d\n", data->bufflen);
+    LOG("decode op dbop bufflen %d\n", data->bufflen);
     data->buff = genq_alloc((sizeof(char))*data->bufflen);
     memcpy(data->buff, buff+types_index, data->bufflen);
     data->types_index = 0;

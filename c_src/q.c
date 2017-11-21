@@ -14,13 +14,34 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#define Q_FILE_MAGIC_4BYTELEN 255 // byte stream is q file with 4-byte vector lengths
+#define Q_FILE_MAGIC_8BYTELEN 254 // byte stream is q file iwth 8-byte vector lengths
+#define Q_FILE_LITTLE_ENDIAN 0x01
+#define Q_FILE_SPLAYED_TABLE 0x20
+#define Q_DISK_REGULAR 0
+#define Q_DISK_SPLAYED 1
+#define Q_DISK_SYMENUM 2
+#define Q_DISK_STRDATA 3
+#define Q_DISK_ERROR -1
+
 int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts);
 int ei_x_encode_dbop_result(QWorkDbOp* data, K r, QOpts* opts);
 int ei_x_encode_decodebinary_result(QWorkDecodeBinary* data, K r, QOpts* opts);
+int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts);
 void configure_socket(QWorkHOpen* data);
 
-K db_column(K kdata, const char* column_name);
-int db_column_pos(K kdata, const char* column_name);
+K table_column(K kdata, const char* column_name);
+int table_column_pos(K kdata, const char* column_name);
+K dict_entry(K kdata, const char* name);
+int dict_entry_pos(K kdata, const char* name);
+K db_read_sym_file(const char* sym_file);
+
+int q_get_disk_file_format(const unsigned char* filebytes, int size);
+int q_get_fptr_disk_file_format(FILE *fptr);
+int q_get_fptr_ktype(FILE *fptr);
+int q_ipc_create_sym(K* kbytes, const unsigned char* filebytes, int size);
+int q_get_le(int ktype, const unsigned char* x);
+void q_set_le(int ktype, G* x, int y);
 
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
@@ -231,6 +252,47 @@ int str_ends_with(const char *str, const char *suffix) {
     return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
 
+K db_read_sym_file(const char* sym_file) {
+    struct stat s;
+    int fd = open(sym_file, O_RDONLY);
+    LOG("dbopen sym fd %d\n", fd);
+    int status = fstat(fd, &s);
+    LOG("dbopen sym status %d\n", status);
+    int size = s.st_size;
+    LOG("dbopen sym size %d\n", size);
+
+    void* mmap_data = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if(mmap_data == MAP_FAILED) {
+        LOG("dbopen sym mmap failed %d\n", -1);
+        return 0;
+    }
+
+    K sym_bytes = 0;
+    LOG("dbopen sym copying %d bytes\n", size);
+    if(0 != q_ipc_create_sym(&sym_bytes, mmap_data, size)) {
+        kx_guarded_decr_ref(sym_bytes);
+        return 0;
+    }
+
+    LOG("dbopen sym unmapping %d\n", size);
+    munmap(mmap_data, size);
+
+    LOG("dbopen sym closing %d\n", fd);
+    close(fd);
+
+    LOG("dbopen sym deserializing bytes %d\n", size);
+    int ok = okx(sym_bytes);
+    LOG("dbopen sym okx %d\n", ok);
+    if(ok) {
+        errno = 0;
+        K symdata = d9(sym_bytes);
+        r0(sym_bytes);
+        return symdata;
+    }
+    kx_guarded_decr_ref(sym_bytes);
+    return 0;
+}
+
 void q_dbopen(QWorkDbOp* data, QOpts* opts){
     LOG("dbopen %d\n", 0);
 
@@ -252,64 +314,39 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     //   4. Initializes the file pos for each file so that reading data
     //      can follow.
     FILE *fptr;
-    K filename_column = db_column(table, "filename");
-    K column_data_column = db_column(table, "column_data");
-    K file_handle_column = db_column(table, "file_handle");
-    K data_handle_column = db_column(table, "data_handle");
+    K filename_column = table_column(table, "filename");
+    K column_data_column = table_column(table, "column_data");
+    K file_handle_column = table_column(table, "file_handle");
+    K data_handle_column = table_column(table, "data_handle");
+    K column_type_column = table_column(table, "column_type");
+    K file_pos_column = table_column(table, "file_pos");
     K symdata = 0;
+    int ktype = 0;
     for(int i=0; i<filename_column->n; ++i) {
-        LOG("db open %s\n", kS(filename_column)[i]);
-        LOG("db open %s\n", kS(column_data_column)[i]);
+        LOG("dbopen reading %s\n", kS(filename_column)[i]);
+        LOG("dbopen data %s\n", kS(column_data_column)[i]);
+
+        // Open file
         fptr = fopen(kS(filename_column)[i], "r");
         kJ(file_handle_column)[i] = (unsigned long long)fptr;
+        ktype = q_get_fptr_ktype(fptr);
+        kJ(column_type_column)[i] = (long)ktype;
+        LOG("db open ktype %d\n", ktype);
 
+        kJ(file_pos_column)[i] = 0;
+
+        // Open data file
         const char* data_col_file = kS(column_data_column)[i];
         if(str_ends_with(data_col_file, "/sym")) {
             if(symdata == 0) {
-                struct stat s;
-                int fd = open(data_col_file, O_RDONLY);
-                LOG("dbopen sym fd %d\n", fd);
-                int status = fstat(fd, &s);
-                LOG("dbopen sym status %d\n", status);
-                int size = s.st_size;
-                LOG("dbopen sym size %d\n", size);
-                K sym_bytes = ktn(KG, size);
-
-                void* mmap_data = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0);
-                if(mmap_data == MAP_FAILED) {
-                    LOG("dbopen sym mmap failed %d\n", -1);
+                symdata = db_read_sym_file(data_col_file);
+                if(symdata == 0) {
                     HANDLE_ERROR("sym", 3);
+                    return;
                 }
-                LOG("dbopen sym copying %d bytes\n", size);
-                memcpy(kG(sym_bytes), mmap_data, size);
-
-                LOG("dbopen sym unmapping %d\n", size);
-                munmap(mmap_data, size);
-
-                LOG("dbopen sym closing %d\n", fd);
-                close(fd);
-
-                LOG("dbopen sym deserializing bytes %d\n", size);
-                int ok = okx(sym_bytes);
-                LOG("dbopen sym okx %d\n", ok);
-                if(ok) {
-                    // This segfaults because the on-disk representation
-                    // has a different header than the IPC representation that
-                    // d9() expects. I haven't found any documentation about
-                    // the on-disk header, but I think we can reverse
-                    // engineer it well enough to read simple tables
-                    //
-                    // I wonder what happens if we try to call the "dot" function
-                    // with either `get or `:.
-                    symdata = d9(sym_bytes);
-                    HANDLE_K_ERRNO(r0(sym_bytes));
-                } else {
-                    HANDLE_ERROR("okx", 3);
+                for(int j=0; j<50; ++j) {
+                    LOG("db open sym %s\n", kS(symdata)[j]);
                 }
-                LOG("dbopen sym done deserializing bytes %d\n", size);
-
-                LOG("db open sym file: "FMT_KN"\n", sym_bytes->n);
-                r0(sym_bytes);
             }
             // Magic number (-11) to signify that this sym data is held in
             // memory in the dbstate
@@ -343,12 +380,300 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     }
 }
 void q_dbnext(QWorkDbOp* data, QOpts* opts){
-    HANDLE_ERROR("access", 6);
+    K num_records;
+    int ei_res = ei_decode_k(data->buff, &data->types_index,
+            &data->values_index, &num_records, opts);
+    if(ei_res < 0) {
+        HANDLE_ERROR("ei_decode_k", 11);
+        LOG("dbnext ei error - %s\n", "ei_decode_k");
+        return;
+    }
+
+    if(num_records->t != -KJ) {
+        HANDLE_ERROR("long", 4);
+        return;
+    }
+
+    LOG("dbnext getting %lld records\n", num_records->j);
+
+    int result = ei_x_q_dbnext(data, num_records->j, opts);
+    if(result < 0) {
+        HANDLE_ERROR("eix", 3);
+        return;
+    }
 }
+
+int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
+    K dbstate = (K)data->n;
+    if (dbstate == 0) {
+        HANDLE_ERROR("nostate", 7);
+        return -1;
+    }
+    K table = dict_entry(dbstate, "table");
+    if(table == 0) {
+        HANDLE_ERROR("table", 5);
+        return -1;
+    }
+    K sym = dict_entry(dbstate, "sym");
+    if(sym == 0) {
+        HANDLE_ERROR("sym", 3);
+        return -1;
+    }
+    K filename_column = table_column(table, "filename");
+    K column_data_column = table_column(table, "column_data");
+    K file_handle_column = table_column(table, "file_handle");
+    K data_handle_column = table_column(table, "data_handle");
+    K column_type_column = table_column(table, "column_type");
+    K file_pos_column = table_column(table, "file_pos");
+    K column_name_column = table_column(table, "column_name");
+    int ktype = 0;
+    FILE *fptr;
+    long long_ = 0;
+    int int_ = 0;
+    double double_ = 0;
+    float float_ = 0;
+    long pos = 0;
+    char char_ = 0;
+    short short_ = 0;
+    char buffer[1024] = {0};
+    int ok = 0;
+
+    EI(ei_x_new(&data->x));
+    data->has_x = 1;
+    //EI(ei_x_encode_list_header(&data->x, num_records));
+
+    for(int i=0; i < num_records; ++i) {
+        for(int j=0; j < column_name_column->n; ++j) {
+            LOG("dbnext reading %s\n", kS(filename_column)[j]);
+            LOG("dbnext data %s\n", kS(column_data_column)[j]);
+            ktype = kJ(column_type_column)[j];
+            fptr = (FILE*)kJ(file_handle_column)[j];
+
+            switch (ktype) {
+                case KT: // time
+                    ok = 1 == fread((void*)&int_, 4, 1, fptr);
+                    break;
+                case KV: // second
+                    ok = 1 == fread((void*)&int_, 4, 1, fptr);
+                    break;
+                case KU: // minute
+                    ok = 1 == fread((void*)&int_, 4, 1, fptr);
+                    break;
+                case KN: // timespan
+                    ok = 1 == fread((void*)&long_, 8, 1, fptr);
+                    break;
+                case KZ: // datetime
+                    ok = 1 == fread((void*)&double_, 8, 1, fptr);
+                    break;
+                case KD: // date
+                    ok = 1 == fread((void*)&int_, 4, 1, fptr);
+                    break;
+                case KM: // month
+                    ok = 1 == fread((void*)&int_, 4, 1, fptr);
+                    break;
+                case KI: // int
+                    ok = 1 == fread((void*)&int_, 4, 1, fptr);
+                    break;
+                case KP: // timestamp
+                    ok = 1 == fread((void*)&long_, 8, 1, fptr);
+                    break;
+                case KJ: // long
+                    ok = 1 == fread((void*)&long_, 8, 1, fptr);
+                    break;
+                case KF: // float
+                    ok = 1 == fread((void*)&double_, 8, 1, fptr);
+                    break;
+                case KC: // char
+                    ok = 1 == fread((void*)&char_, 1, 1, fptr);
+                    break;
+                case KE: // real
+                    ok = 1 == fread((void*)&float_, 4, 1, fptr);
+                    break;
+                case KH: // short
+                    ok = 1 == fread((void*)&short_, 1, 1, fptr);
+                    break;
+                case KG: // byte
+                    ok = 1 == fread((void*)&char_, 1, 1, fptr);
+                    break;
+                case KB: // boolean
+                    ok = 1 == fread((void*)&char_, 1, 1, fptr);
+                    break;
+                case KS: // symbol
+                    // This typically won't be used since syms in a splayed
+                    // table should have an enumeration file (sym)
+                    memset(buffer, 0, 1024);
+                    ok = 1;
+                    for(int_=0; int_<1024; ++int_) {
+                        ok |= 1 == fread(buffer+int_, 1, 1, fptr);
+                        if (buffer[int_] == 0) {
+                            break;
+                        }
+                    }
+                    break;
+                case 0: // enum'd symbol
+                    ok = 1 == fread((void*)&int_, 4, 1, fptr);
+                    break;
+                case 87: // special string type
+                    pos = kJ(file_pos_column)[j];
+                    LOG("dbnext string pos %ld\n", pos);
+                    ok = 1 == fread((void*)&long_, 8, 1, fptr);
+
+                    break;
+                default:
+                    LOG("dbnext unhandled type %d\n", ktype);
+                    break;
+            }
+
+            if(ok && j == 0) {
+                EI(ei_x_encode_list_header(&data->x, 1));
+                EI(ei_x_encode_map_header(&data->x, column_name_column->n));
+            } else if(!ok && j == 0) {
+                break;
+            } else {
+                // We already started the map, can't back out now!
+                EI(ei_x_encode_atom(&data->x, kS(column_name_column)[j]));
+                EI(ei_x_encode_atom(&data->x, "null"));
+                continue;
+            }
+
+            EI(ei_x_encode_atom(&data->x, kS(column_name_column)[j]));
+
+            switch (ktype) {
+                case KT: // time
+                    EI(ei_x_encode_ki_val(&data->x, int_));
+                    break;
+                case KV: // second
+                    EI(ei_x_encode_ki_val(&data->x, int_));
+                    break;
+                case KU: // minute
+                    EI(ei_x_encode_ki_val(&data->x, int_));
+                    break;
+                case KN: // timespan
+                    EI(ei_x_encode_kj_val(&data->x, long_));
+                    break;
+                case KZ: // datetime
+                    EI(ei_x_encode_datetime_as_now(&data->x, double_));
+                    break;
+                case KD: // date
+                    EI(ei_x_encode_ki_val(&data->x, int_));
+                    break;
+                case KM: // month
+                    EI(ei_x_encode_ki_val(&data->x, int_));
+                    break;
+                case KI: // int
+                    EI(ei_x_encode_ki_val(&data->x, int_));
+                    break;
+                case KP: // timestamp
+                    EI(ei_x_encode_timestamp_as_now(&data->x, long_));
+                    break;
+                case KJ: // long
+                    EI(ei_x_encode_kj_val(&data->x, long_));
+                    break;
+                case KF: // float
+                    EI(ei_x_encode_kf_val(&data->x, double_));
+                    break;
+                case KC: // char
+                    EI(ei_x_encode_char(&data->x, char_));
+                    break;
+                case KE: // real
+                    EI(ei_x_encode_kf_val(&data->x, float_));
+                    break;
+                case KH: // short
+                    EI(ei_x_encode_ki_val(&data->x, short_));
+                    break;
+                case KG: // byte
+                    EI(ei_x_encode_char(&data->x, char_));
+                    break;
+                case KB: // boolean
+                    if(char_) {
+                        EI(ei_x_encode_atom(&data->x, "true"));
+                    } else {
+                        EI(ei_x_encode_atom(&data->x, "false"));
+                    }
+                    break;
+                case KS: // symbol
+                    // This typically won't be used since syms in a splayed
+                    // table should have an enumeration file (sym)
+                    if (int_ == 1024) {
+                        EI(ei_x_encode_atom(&data->x, "null"));
+                    } else {
+                        EI(ei_x_encode_binary(&data->x, buffer, int_));
+                    }
+                    break;
+                case 0: // enum'd symbol
+                    if(int_ > 0 && int_ < sym->n) {
+                        const char *s = kS(sym)[int_];
+                        int len = strlen(s);
+                        LOG("dbnext symbol index %d %s, len %d\n",
+                                int_, s, (int)len);
+                        EI(ei_x_encode_binary(&data->x, s, len));
+                    } else {
+                        // null symbol
+                        EI(ei_x_encode_atom(&data->x, "null"));
+                    }
+                    break;
+                case 87: // special string type
+                    LOG("dbnext string val %ld\n", long_);
+                    fptr = (FILE*)kJ(data_handle_column)[j];
+
+                    char* string_ = genq_alloc((sizeof(char))*(long_-pos));
+                    ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
+                    if(!ok) {
+                        EI(ei_x_encode_atom(&data->x, "null"));
+                        ok = 1;
+                    } else {
+                        EI(ei_x_encode_binary(&data->x, string_, long_-pos));
+                    }
+                    genq_free(string_);
+
+                    kJ(file_pos_column)[j] = long_;
+
+                    break;
+                default:
+                    LOG("dbnext unhandled type %d\n", ktype);
+                    EI(ei_x_encode_atom(&data->x, "null"));
+                    break;
+            }
+        }
+        if(!ok) {
+            break;
+        }
+    }
+
+    EI(ei_x_encode_empty_list(&data->x));
+    return 0;
+}
+
 void q_dbclose(QWorkDbOp* data, QOpts* opts){
     // Close all file handles
     //
-    K dbstate = (K)data->handle;
+    FILE *fptr;
+    long long data_f = 0;
+    K dbstate = (K)data->n;
+    if (dbstate == 0) {
+        HANDLE_ERROR("nostate", 7);
+        return;
+    }
+    K table = dict_entry(dbstate, "table");
+    if(table == 0) {
+        HANDLE_ERROR("table", 5);
+        return;
+    }
+    K file_handle_column = table_column(table, "file_handle");
+    K data_handle_column = table_column(table, "data_handle");
+    for(int i=0; i<file_handle_column->n; ++i) {
+        fptr = (FILE*)kJ(file_handle_column)[i];
+        if(fptr != 0) {
+            LOG("dbclose closing file %lld\n", (unsigned long long)fptr);
+            fclose(fptr);
+        }
+        data_f = kJ(data_handle_column)[i];
+        if(data_f > 0) {
+            LOG("dbclose closing data file %lld\n", data_f);
+            fptr = (FILE*)data_f;
+            fclose(fptr);
+        }
+    }
     kx_guarded_decr_ref(dbstate);
 
     K r = ks(ss("ok"));
@@ -360,8 +685,11 @@ void q_dbclose(QWorkDbOp* data, QOpts* opts){
     }
 }
 
-K db_column(K kdata, const char* column_name) {
-    int pos = db_column_pos(kdata, column_name);
+K table_column(K kdata, const char* column_name) {
+    if(kdata->t != XT) {
+        return 0;
+    }
+    int pos = table_column_pos(kdata, column_name);
     if(pos < 0) {
         return 0;
     }
@@ -369,7 +697,10 @@ K db_column(K kdata, const char* column_name) {
     return kK(values)[pos];
 }
 
-int db_column_pos(K kdata, const char* column_name) {
+int table_column_pos(K kdata, const char* column_name) {
+    if(kdata->t != XT) {
+        return 0;
+    }
     K keys = kK(kdata->k)[0];
     int i=0;
     for(i=0; i<keys->n; ++i) {
@@ -381,9 +712,203 @@ int db_column_pos(K kdata, const char* column_name) {
     return -1;
 }
 
+K dict_entry(K kdata, const char* name) {
+    if(kdata->t != XD) {
+        return 0;
+    }
+    LOG("dict pos %d\n", 0);
+    int pos = dict_entry_pos(kdata, name);
+    if(pos < 0) {
+        return 0;
+    }
+    K values = kK(kdata)[1];
+    return kK(values)[pos];
+}
+
+int dict_entry_pos(K kdata, const char* name) {
+    if(kdata->t != XD) {
+        return 0;
+    }
+    K keys = kK(kdata)[0];
+    if(keys == 0) {
+        return -1;
+    }
+    int i=0;
+    for(i=0; i<keys->n; ++i) {
+        const char* key_name = kS(keys)[i];
+        if(0==strcmp(name, key_name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 int ei_x_encode_dbop_result(QWorkDbOp* data, K r, QOpts* opts) {
     EI(ei_x_new(&data->x));
     data->has_x = 1;
     EI(ei_x_encode_k(&data->x, r, opts));
     return 0;
+}
+
+int q_get_disk_file_format(const unsigned char* filebytes, int size) {
+    // possible a string data file, shouldn't be passed in here
+    if (size < 9) {
+        return Q_DISK_ERROR;
+    }
+    if (filebytes[0] == Q_FILE_MAGIC_4BYTELEN) {
+        if (filebytes[1] == Q_FILE_LITTLE_ENDIAN) {
+            // regular file (e.g. sym file)
+            // Type is lower short of byte 2
+            // Attr is byte 3
+            // Vec len is pos 4-7
+            // Data starts at pos 8
+            // null-terminated strings follow
+            return Q_DISK_REGULAR;
+        } else if (filebytes[1] == Q_FILE_SPLAYED_TABLE) {
+            // file that is part of a splayed table
+            // Type is lower short of byte as pos 8
+            // Attr is pos 10
+            // Vec len is pos 12-15
+            // Data starts at pos 16
+            // Data size according to type
+            //
+            // Note: if type is 0x57, this is a string index file. Notice that
+            // the lower short is 0x7, long type, higher short is 0x5, which seems
+            // to be a modifier on the type. Each long corresponds to the first
+            // position of the next string in the file. In other words
+            // (pos - prevpos) is the string length, and prevpos defaults to 0 for
+            // the first string
+            return Q_DISK_SPLAYED;
+        } else if (filebytes[1] == 0) {
+            return Q_DISK_ERROR;
+        } else {
+            if (filebytes[8] == 0) {
+                // sym enumeration.
+                // For enumeration name: read bytes starting at pos 1 until
+                // max pos 7, look for null term, or add in null term.
+                //
+                // Attr is at pos 10
+                // Vec len is pos 12-15, little endian
+                // Data starts at pos 16
+                // Data is 4-byte ints, index to sym file
+                return Q_DISK_SYMENUM;
+            }
+        }
+    } else if (filebytes[0] == Q_FILE_MAGIC_8BYTELEN) {
+        // I think 0xfe means vec len is 8 bytes instead of 4
+        return Q_DISK_ERROR;
+    }
+
+    // assume its a string data file.
+    // Strings are not null-terminated, just have to rely on index list
+    // in corresponding file. (type 0x57 above)
+    return Q_DISK_STRDATA;
+}
+
+int q_get_fptr_disk_file_format(FILE *fptr) {
+    const int hdr_buf_size = 9;
+    unsigned char hdr_buf[hdr_buf_size] = {0};
+    int read_bytes = fread(hdr_buf, 1, hdr_buf_size, fptr);
+    if (read_bytes < hdr_buf_size){
+        return Q_DISK_ERROR;
+    }
+
+    return q_get_disk_file_format(hdr_buf, hdr_buf_size);
+}
+
+int q_get_fptr_ktype(FILE *fptr) {
+    int ftype = q_get_fptr_disk_file_format(fptr);
+    char ktype = 0;
+    switch (ftype) {
+        case Q_DISK_SPLAYED:
+            fseek(fptr, 8, SEEK_SET);
+            fread((void*)&ktype, 1, 1, fptr);
+            fseek(fptr, 16, SEEK_SET);
+            return ktype;
+        case Q_DISK_SYMENUM:
+            fseek(fptr, 16, SEEK_SET);
+            return 0;
+        case Q_DISK_STRDATA:
+            fseek(fptr, 0, SEEK_SET);
+            return -1;
+    }
+
+    return -1;
+}
+
+int q_ipc_create_sym(K* kbytes, const unsigned char* filebytes, int size) {
+    // NOTE : much of this function is general purpose, but there is a 
+    // type == KS check that makes it specific to sym file for now
+    //
+    if (size < 8) {
+        return -1;
+    }
+    int ftype = q_get_disk_file_format(filebytes, size);
+    LOG("q_ipc_create_sym ftype %d\n", ftype);
+    switch (ftype) {
+        case Q_DISK_REGULAR:
+            {
+                if (size < 9) {
+                    return -1;
+                }
+
+                // Read the data from the input bytes
+                unsigned char type = filebytes[2];
+                unsigned char attr = filebytes[3];
+                int veclen = q_get_le(KI, filebytes + 4);
+                const unsigned char* data = filebytes + 8;
+                int datasize = size-8;
+
+                // compute correct veclen.. will be different for different
+                // types. the veclen in the file isn't reliable, sadly
+                if (type == KS) {
+                    veclen = 0;
+                    for(int i=0; i<datasize; ++i) {
+                        if(data[i] == 0) {
+                            veclen++;
+                        }
+                    }
+                }
+
+                LOG("q_ipc_create_sym reg file type=%d, attr=%d, veclen=%d, datasize=%d\n",
+                        type, attr, veclen, datasize);
+
+                // Transform to the IPC format understood by d9()
+                int ipc_buffer_size = 14+datasize;
+                (*kbytes) = ktn(KG, ipc_buffer_size);
+                memset(kG(*kbytes), 0, ipc_buffer_size);
+                kG(*kbytes)[0] = Q_FILE_LITTLE_ENDIAN;
+                q_set_le(KI, kG(*kbytes)+4, ipc_buffer_size);
+                kG(*kbytes)[8] = type;
+                kG(*kbytes)[9] = attr;
+                q_set_le(KI, kG(*kbytes)+10, veclen);
+                memcpy(kG(*kbytes)+14, data, datasize);
+
+                LOG("q_ipc_create_sym reg file buffsize=%d msgsize=%d\n",
+                        ipc_buffer_size, ipc_buffer_size);
+
+                return 0;
+            }
+            break;
+    }
+    return -1;
+}
+
+int q_get_le(int ktype, const unsigned char* x) {
+    if(ktype == KI) {
+        return (x[0]) |
+            (x[1] << 8) |
+            (x[2] << 16) |
+            (x[3] << 24);
+    }
+    return 0;
+}
+
+void q_set_le(int ktype, G* x, int y) {
+    if(ktype == KI) {
+        x[0] = (y) & 0xFF;
+        x[1] = (y >> 8) & 0xFF;
+        x[2] = (y >> 16) & 0xFF;
+        x[3] = (y >> 24) & 0xFF;
+    }
 }
