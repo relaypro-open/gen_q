@@ -1,9 +1,9 @@
 .gen_q
-ebin
-deps
 erl_crash.dump
 gen_q.config
 *.o
 *.so
 *.swp
 .eunit
+_build
+*.d

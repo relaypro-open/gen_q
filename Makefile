@@ -1,11 +1,12 @@
 all:
-	@(./rebar compile)
+	@(./build/c.sh c_src/c.o)
+	@(rebar3 compile)
 
 clean:
 	@(rm -f c_src/*.o)
-	@(rm -f priv/gen_q.so)
-	@(./rebar clean)
+	@(rm -f priv/gen_q_drv.so)
+	@(rebar3 clean)
 
 test: all
 	@(test/configure)
-	@(./rebar eunit skip_deps=true suite=gen_q_port_tests)
+	@(rebar3 eunit suite=gen_q_port_tests)
