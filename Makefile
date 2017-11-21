@@ -1,5 +1,4 @@
 all:
-	@(./build/c.sh c_src/c.o)
 	@(rebar3 compile)
 
 clean:
