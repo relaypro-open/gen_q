@@ -256,7 +256,7 @@ K db_read_sym_file(const char* sym_file) {
     struct stat s;
     int fd = open(sym_file, O_RDONLY);
     LOG("dbopen sym fd %d\n", fd);
-    int status = fstat(fd, &s);
+    fstat(fd, &s);
     LOG("dbopen sym status %d\n", status);
     int size = s.st_size;
     LOG("dbopen sym size %d\n", size);
@@ -419,8 +419,8 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
         HANDLE_ERROR("sym", 3);
         return -1;
     }
-    K filename_column = table_column(table, "filename");
-    K column_data_column = table_column(table, "column_data");
+    //K filename_column = table_column(table, "filename");
+    //K column_data_column = table_column(table, "column_data");
     K file_handle_column = table_column(table, "file_handle");
     K data_handle_column = table_column(table, "data_handle");
     K column_type_column = table_column(table, "column_type");
@@ -529,7 +529,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                 EI(ei_x_encode_map_header(&data->x, column_name_column->n));
             } else if(!ok && j == 0) {
                 break;
-            } else {
+            } else if(!ok) {
                 // We already started the map, can't back out now!
                 EI(ei_x_encode_atom(&data->x, kS(column_name_column)[j]));
                 EI(ei_x_encode_atom(&data->x, "null"));
@@ -537,6 +537,12 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
             }
 
             EI(ei_x_encode_atom(&data->x, kS(column_name_column)[j]));
+
+            // HACK
+            if(str_ends_with(kS(column_name_column)[j], "private_data_expiry_0")) {
+                EI(ei_x_encode_tuple_header(&data->x, 2));
+                EI(ei_x_encode_atom(&data->x, "binary"));
+            }
 
             switch (ktype) {
                 case KT: // time
