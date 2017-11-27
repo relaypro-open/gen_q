@@ -49,6 +49,8 @@ void fprintf_f(FILE *fptr, double d);
 void fprintf_z(FILE *fptr, double d);
 void fprintf_p(FILE *fptr, long long j);
 
+K global_sym = 0;
+
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
     if(errno) {                                                       \
@@ -342,7 +344,10 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     K column_type_column = dict_entry(input, "column_type");
     K file_pos_column = dict_entry(input, "file_pos");
     K column_name_column = dict_entry(input, "column_name");
-    K symdata = 0;
+    K symdata = global_sym;
+    if(global_sym !=0) {
+        r1(global_sym);
+    }
     int ktype = 0;
     int i = 0;
     for(i=0; i<filename_column->n; ++i) {
@@ -374,10 +379,8 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
                     HANDLE_ERROR("sym", 3);
                     return;
                 }
-                int j = 0;
-                for(j=0; j<50; ++j) {
-                    LOG("db open sym %s\n", kS(symdata)[j]);
-                }
+                global_sym = symdata;
+                r1(global_sym);
             }
             // Magic number (-11) to signify that this sym data is held in
             // memory in the dbstate
