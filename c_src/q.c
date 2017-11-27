@@ -314,9 +314,17 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
 
     K outputfile = dict_entry(input, "outputfile");
     FILE *outputfile_h = 0;
+    K outputfile_append_k = dict_entry(input, "outputfile_append");
+    int outputfile_append = 0 == strcmp(outputfile_append_k->s, "true");
     if(0!=strcmp(outputfile->s, "undefined")) {
-        outputfile_h = fopen(outputfile->s, "w+");
+        if (outputfile_append) 
+            outputfile_h = fopen(outputfile->s, "a+");
+        else
+            outputfile_h = fopen(outputfile->s, "w+");
     }
+
+    K csv_header_k = dict_entry(input, "csv_header");
+    int csv_header = 0 == strcmp(csv_header_k->s, "true");
 
     K return_data = dict_entry(input, "return_data");
 
@@ -340,7 +348,7 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
         LOG("dbopen reading %s\n", kS(filename_column)[i]);
         LOG("dbopen data %s\n", kS(column_data_column)[i]);
 
-        if (outputfile_h != 0) {
+        if (outputfile_h != 0 && csv_header) {
             fwrite(kS(column_name_column)[i], 1, strlen(kS(column_name_column)[i]), outputfile_h);
             if(i+1 != filename_column->n) {
                 fwrite(",", 1, 1, outputfile_h);
@@ -378,7 +386,7 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
         }
     }
 
-    if (outputfile_h != 0) {
+    if (outputfile_h != 0 && csv_header) {
         fwrite("\n", 1, 1, outputfile_h);
     }
 

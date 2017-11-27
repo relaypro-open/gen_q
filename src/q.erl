@@ -257,11 +257,15 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
             FilePosC = lists:duplicate(length(FilenameC), -1),
 
             Outputfile = proplists:get_value(outputfile, Opts),
+            OutputfileAppend = proplists:get_value(outputfile_append, Opts, false),
+            CsvHeader = proplists:get_value(csv_header, Opts, true),
             ReturnData = proplists:get_value(return_data, Opts, true),
 
             InputMeta = {dict, {list, symbol},
                                {list, [
                                        symbol, % outputfile
+                                       symbol, % outputfile_append
+                                       symbol, % csv_header
                                        symbol, % return_data
                                        {list, symbol}, % FilenameC
                                        {list, symbol}, % ColumnDataC
@@ -272,6 +276,8 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
                                        {list, symbol} % ColumnNameC
                                       ]}},
             InputContent = {[outputfile,
+                             outputfile_append,
+                             csv_header,
                              return_data,
                              filename,
                              column_data,
@@ -282,6 +288,8 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
                              column_name
                             ],
                             [Outputfile,
+                             OutputfileAppend,
+                             CsvHeader,
                              ReturnData,
                              FilenameC,
                              ColumnDataC,
