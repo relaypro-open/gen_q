@@ -43,6 +43,12 @@ int q_ipc_create_sym(K* kbytes, const unsigned char* filebytes, int size);
 int q_get_le(int ktype, const unsigned char* x);
 void q_set_le(int ktype, G* x, int y);
 
+void fprintf_i(FILE *fptr, int i);
+void fprintf_j(FILE *fptr, long long j);
+void fprintf_f(FILE *fptr, double d);
+void fprintf_z(FILE *fptr, double d);
+void fprintf_p(FILE *fptr, long long j);
+
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
     if(errno) {                                                       \
@@ -334,6 +340,13 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
         LOG("dbopen reading %s\n", kS(filename_column)[i]);
         LOG("dbopen data %s\n", kS(column_data_column)[i]);
 
+        if (outputfile_h != 0) {
+            fwrite(kS(column_name_column)[i], 1, strlen(kS(column_name_column)[i]), outputfile_h);
+            if(i+1 != filename_column->n) {
+                fwrite(",", 1, 1, outputfile_h);
+            }
+        }
+
         // Open file
         fptr = fopen(kS(filename_column)[i], "r");
         kJ(file_handle_column)[i] = (unsigned long long)fptr;
@@ -363,6 +376,10 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
             fptr = fopen(data_col_file, "r");
             kJ(data_handle_column)[i] = (unsigned long long)fptr;
         }
+    }
+
+    if (outputfile_h != 0) {
+        fwrite("\n", 1, 1, outputfile_h);
     }
 
     if(symdata == 0) {
@@ -446,6 +463,8 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
         HANDLE_ERROR("sym", 3);
         return -1;
     }
+    K outputfile_k = dict_entry(dbstate, "outputfile");
+    FILE *outputfile_h = (FILE*)outputfile_k->j;
     K return_data_k = dict_entry(dbstate, "return_data");
     LOG("dbnext return_data_k is %s\n", return_data_k->s);
     int return_data = 0==strcmp(return_data_k->s, "true");
@@ -459,7 +478,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
     K column_name_column = dict_entry(dbstate, "column_name");
     int ktype = 0;
     FILE *fptr;
-    long long_ = 0;
+    long long long_ = 0;
     int int_ = 0;
     double double_ = 0;
     float float_ = 0;
@@ -555,10 +574,133 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     break;
             }
 
+            // WRITE DATA TO CSV
+            if (outputfile_h != 0) {
+                switch (ktype) {
+                    case KT: // time
+                        //EI(ei_x_encode_ki_val(&data->x, int_));
+                        fprintf_i(outputfile_h, int_);
+                        break;
+                    case KV: // second
+                        //EI(ei_x_encode_ki_val(&data->x, int_));
+                        fprintf_i(outputfile_h, int_);
+                        break;
+                    case KU: // minute
+                        //EI(ei_x_encode_ki_val(&data->x, int_));
+                        fprintf_i(outputfile_h, int_);
+                        break;
+                    case KN: // timespan
+                        //EI(ei_x_encode_kj_val(&data->x, long_));
+                        fprintf_j(outputfile_h, long_);
+                        break;
+                    case KZ: // datetime
+                        //EI(ei_x_encode_datetime_as_now(&data->x, double_));
+                        fprintf_z(outputfile_h, double_);
+                        break;
+                    case KD: // date
+                        //EI(ei_x_encode_ki_val(&data->x, int_));
+                        fprintf_i(outputfile_h, int_);
+                        break;
+                    case KM: // month
+                        //EI(ei_x_encode_ki_val(&data->x, int_));
+                        fprintf_i(outputfile_h, int_);
+                        break;
+                    case KI: // int
+                        //EI(ei_x_encode_ki_val(&data->x, int_));
+                        fprintf_i(outputfile_h, int_);
+                        break;
+                    case KP: // timestamp
+                        //EI(ei_x_encode_timestamp_as_now(&data->x, long_));
+                        fprintf_p(outputfile_h, long_);
+                        break;
+                    case KJ: // long
+                        //EI(ei_x_encode_kj_val(&data->x, long_));
+                        fprintf_j(outputfile_h, long_);
+                        break;
+                    case KF: // float
+                        //EI(ei_x_encode_kf_val(&data->x, double_));
+                        fprintf_f(outputfile_h, double_);
+                        break;
+                    case KC: // char
+                        //EI(ei_x_encode_char(&data->x, char_));
+                        fprintf(outputfile_h, "%c", char_);
+                        break;
+                    case KE: // real
+                        //EI(ei_x_encode_kf_val(&data->x, float_));
+                        fprintf_f(outputfile_h, double_);
+                        break;
+                    case KH: // short
+                        //EI(ei_x_encode_ki_val(&data->x, short_));
+                        fprintf_i(outputfile_h, (int)short_);
+                        break;
+                    case KG: // byte
+                        //EI(ei_x_encode_char(&data->x, char_));
+                        fprintf_i(outputfile_h, (int)char_);
+                        break;
+                    case KB: // boolean
+                        if(char_) {
+                        //    EI(ei_x_encode_atom(&data->x, "true"));
+                            fwrite("true", 1, 4, outputfile_h);
+                        } else {
+                        //    EI(ei_x_encode_atom(&data->x, "false"));
+                            fwrite("false", 1, 5, outputfile_h);
+                        }
+                        break;
+                    case KS: // symbol
+                        // This typically won't be used since syms in a splayed
+                        // table should have an enumeration file (sym)
+                        if (int_ == 1024) {
+                        //    EI(ei_x_encode_atom(&data->x, "null"));
+                        } else {
+                        //    EI(ei_x_encode_binary(&data->x, buffer, int_));
+                            fprintf(outputfile_h, "%s", buffer);
+                        }
+                        break;
+                    case 0: // enum'd symbol
+                        if(int_ > 0 && int_ < sym->n) {
+                        //    const char *s = kS(sym)[int_];
+                        //    int len = strlen(s);
+                        //    LOG("dbnext symbol index %d %s, len %d\n",
+                        //            int_, s, (int)len);
+                        //    EI(ei_x_encode_binary(&data->x, s, len));
+                            fprintf(outputfile_h, "%s", kS(sym)[int_]);
+                        } else {
+                        //    // null symbol
+                        //    EI(ei_x_encode_atom(&data->x, "null"));
+                        }
+                        break;
+                    case 87: // special string type
+                        //LOG("dbnext string val %ld\n", long_);
+                        fptr = (FILE*)kJ(data_handle_column)[j];
+
+                        char* string_ = genq_alloc((sizeof(char))*(long_-pos));
+                        ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
+                        if(!ok) {
+                        //    EI(ei_x_encode_atom(&data->x, "null"));
+                            ok = 1;
+                        } else {
+                        //    EI(ei_x_encode_binary(&data->x, string_, long_-pos));
+                              fwrite(string_, 1, long_-pos, outputfile_h);
+                        }
+                        genq_free(string_);
+
+                        kJ(file_pos_column)[j] = long_;
+
+                        break;
+                    default:
+                        LOG("dbnext unhandled type in csv path %d\n", ktype);
+                        break;
+                }
+                if(j+1 != column_name_column->n) {
+                    fwrite(",", 1, 1, outputfile_h);
+                }
+            }
+
             if(!return_data) {
                 continue;
             }
 
+            // WRITE DATA TO EI
             if(ok && j == 0) {
                 EI(ei_x_encode_list_header(&data->x, 1));
                 EI(ei_x_encode_map_header(&data->x, column_name_column->n));
@@ -654,7 +796,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     }
                     break;
                 case 87: // special string type
-                    LOG("dbnext string val %ld\n", long_);
+                    LOG("dbnext string val %lld\n", long_);
                     fptr = (FILE*)kJ(data_handle_column)[j];
 
                     char* string_ = genq_alloc((sizeof(char))*(long_-pos));
@@ -676,6 +818,9 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     break;
             }
         }
+        if (outputfile_h != 0) {
+            fwrite("\n", 1, 1, outputfile_h);
+        }
         if(!ok) {
             break;
         }
@@ -687,6 +832,41 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
         EI(ei_x_encode_long(&data->x, i));
     }
     return 0;
+}
+
+void fprintf_i(FILE *fptr, int i) {
+    if (i == ni ||
+            i == wi) {
+        return;
+    }
+    fprintf(fptr, "%d", i);
+}
+
+void fprintf_j(FILE *fptr, long long j) {
+    if (j == nj ||
+            j == wj) {
+        return;
+    }
+    fprintf(fptr, "%lld", j);
+}
+
+void fprintf_f(FILE *fptr, double d) {
+    if(d == nh || d == wh || d!=d) {
+        return;
+    }
+    fprintf(fptr, "%f", d);
+}
+
+void fprintf_z(FILE *fptr, double d) {
+    if(d == nf || d == wf || d != d) return;
+    long long unix_micros = datetime_to_unix_micros(d);
+    fprintf_j(fptr, unix_micros);
+}
+
+void fprintf_p(FILE *fptr, long long j) {
+    if(j == nj || j == wj) return;
+    long long unix_micros = timestamp_to_unix_micros(j);
+    fprintf_j(fptr, unix_micros);
 }
 
 void q_dbclose(QWorkDbOp* data, QOpts* opts){

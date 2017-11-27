@@ -281,7 +281,7 @@ gen_q_db_op2_test_() ->
                                                     "2014.04.22", "cdr",
                                                     [{outputfile, "/tmp/gen_q_output.csv"},
                                                      {return_data, false}]),
-                      {ok, 0, 1} = q:dbnext(H1, 1),
+                      {ok, 0, 10} = q:dbnext(H1, 10),
                       {ok, 0, {symbol, ok}} = q:dbclose(H1)
               end
              ]

@@ -73,7 +73,6 @@ int ei_x_encode_dict(ei_x_buff* types, ei_x_buff* values, K r, QOpts* opts);
 // helpers
 int msec_to_sec(int s);
 long long datetime_to_unix_timestamp(double d);
-long long datetime_to_unix_micros(double d);
 void timestamp_to_now(long long t, long* mega, long* sec, long* micro);
 void datetime_to_now(double d, long* mega, long* sec, long* micro);
 void unix_micros_to_now(long long t, long* mega, long* sec, long* micro);
@@ -500,6 +499,10 @@ long long datetime_to_unix_micros(double d) {
     return (long long)((d+10957)*8.64e10);
 }
 
+long long timestamp_to_unix_micros(long long j) {
+    return (j + 946684800000000000L) / 1000L;
+}
+
 int ei_x_encode_datetime_as_now(ei_x_buff* values, double f) {
     EI_X_ENCODE_NULL_OR_INF(f, nf, wf);
 
@@ -525,7 +528,7 @@ int ei_x_encode_timestamp_as_now(ei_x_buff* values, long long j) {
 }
 
 void timestamp_to_now(long long t, long* mega, long* sec, long* micro) {
-    t = (t + 946684800000000000L) / 1000L;
+    t = timestamp_to_unix_micros(t);
     unix_micros_to_now(t, mega, sec, micro);
 }
 

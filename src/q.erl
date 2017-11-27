@@ -228,8 +228,8 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
     case file:list_dir(DbPartPath) of
         {ok, Columns0} ->
             % Remove .d file
-            Columns = lists:filter(fun(".d"++_) -> false;
-                                      (_) -> true end, Columns0),
+            Columns = lists:sort(lists:filter(fun(".d"++_) -> false;
+                                      (_) -> true end, Columns0)),
 
             % Find columns with string data
             StringDataColumns = lists:filter(

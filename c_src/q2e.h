@@ -11,5 +11,7 @@ extern int ei_x_encode_timestamp_as_now(ei_x_buff* x, long long t);
 extern int ei_x_encode_datetime_as_now(ei_x_buff* values, double f);
 extern int ei_x_encode_kf_val(ei_x_buff* values, double f);
 extern int ei_x_encode_kh_val(ei_x_buff* values, short h);
+extern long long datetime_to_unix_micros(double d);
+extern long long timestamp_to_unix_micros(long long j);
 
 #endif
