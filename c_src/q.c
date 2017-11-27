@@ -496,6 +496,8 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
     char buffer[1024] = {0};
     int ok = 0;
 
+    int private_data_column_pos = -1;
+
     EI(ei_x_new(&data->x));
     data->has_x = 1;
 
@@ -506,6 +508,12 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
             LOG("dbnext data %s\n", kS(column_name_column)[j]);
             ktype = kJ(column_type_column)[j];
             fptr = (FILE*)kJ(file_handle_column)[j];
+
+            // HACK
+            if(private_data_column_pos < 0 &&
+                    str_ends_with(kS(column_name_column)[j], "private_data_expiry_0")) {
+                private_data_column_pos = j;
+            }
 
             switch (ktype) {
                 case KT: // time
@@ -584,120 +592,122 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
             // WRITE DATA TO CSV
             if (outputfile_h != 0) {
-                switch (ktype) {
-                    case KT: // time
-                        //EI(ei_x_encode_ki_val(&data->x, int_));
-                        fprintf_i(outputfile_h, int_);
-                        break;
-                    case KV: // second
-                        //EI(ei_x_encode_ki_val(&data->x, int_));
-                        fprintf_i(outputfile_h, int_);
-                        break;
-                    case KU: // minute
-                        //EI(ei_x_encode_ki_val(&data->x, int_));
-                        fprintf_i(outputfile_h, int_);
-                        break;
-                    case KN: // timespan
-                        //EI(ei_x_encode_kj_val(&data->x, long_));
-                        fprintf_j(outputfile_h, long_);
-                        break;
-                    case KZ: // datetime
-                        //EI(ei_x_encode_datetime_as_now(&data->x, double_));
-                        fprintf_z(outputfile_h, double_);
-                        break;
-                    case KD: // date
-                        //EI(ei_x_encode_ki_val(&data->x, int_));
-                        fprintf_i(outputfile_h, int_);
-                        break;
-                    case KM: // month
-                        //EI(ei_x_encode_ki_val(&data->x, int_));
-                        fprintf_i(outputfile_h, int_);
-                        break;
-                    case KI: // int
-                        //EI(ei_x_encode_ki_val(&data->x, int_));
-                        fprintf_i(outputfile_h, int_);
-                        break;
-                    case KP: // timestamp
-                        //EI(ei_x_encode_timestamp_as_now(&data->x, long_));
-                        fprintf_p(outputfile_h, long_);
-                        break;
-                    case KJ: // long
-                        //EI(ei_x_encode_kj_val(&data->x, long_));
-                        fprintf_j(outputfile_h, long_);
-                        break;
-                    case KF: // float
-                        //EI(ei_x_encode_kf_val(&data->x, double_));
-                        fprintf_f(outputfile_h, double_);
-                        break;
-                    case KC: // char
-                        //EI(ei_x_encode_char(&data->x, char_));
-                        fprintf(outputfile_h, "%c", char_);
-                        break;
-                    case KE: // real
-                        //EI(ei_x_encode_kf_val(&data->x, float_));
-                        fprintf_f(outputfile_h, double_);
-                        break;
-                    case KH: // short
-                        //EI(ei_x_encode_ki_val(&data->x, short_));
-                        fprintf_i(outputfile_h, (int)short_);
-                        break;
-                    case KG: // byte
-                        //EI(ei_x_encode_char(&data->x, char_));
-                        fprintf_i(outputfile_h, (int)char_);
-                        break;
-                    case KB: // boolean
-                        if(char_) {
-                        //    EI(ei_x_encode_atom(&data->x, "true"));
-                            fwrite("true", 1, 4, outputfile_h);
-                        } else {
-                        //    EI(ei_x_encode_atom(&data->x, "false"));
-                            fwrite("false", 1, 5, outputfile_h);
-                        }
-                        break;
-                    case KS: // symbol
-                        // This typically won't be used since syms in a splayed
-                        // table should have an enumeration file (sym)
-                        if (int_ == 1024) {
-                        //    EI(ei_x_encode_atom(&data->x, "null"));
-                        } else {
-                        //    EI(ei_x_encode_binary(&data->x, buffer, int_));
-                            fprintf(outputfile_h, "%s", buffer);
-                        }
-                        break;
-                    case 0: // enum'd symbol
-                        if(int_ > 0 && int_ < sym->n) {
-                        //    const char *s = kS(sym)[int_];
-                        //    int len = strlen(s);
-                        //    LOG("dbnext symbol index %d %s, len %d\n",
-                        //            int_, s, (int)len);
-                        //    EI(ei_x_encode_binary(&data->x, s, len));
-                            fprintf(outputfile_h, "%s", kS(sym)[int_]);
-                        } else {
-                        //    // null symbol
-                        //    EI(ei_x_encode_atom(&data->x, "null"));
-                        }
-                        break;
-                    case 87: // special string type
-                        //LOG("dbnext string val %ld\n", long_);
-                        fptr = (FILE*)kJ(data_handle_column)[j];
+                if (j != private_data_column_pos) {
+                    switch (ktype) {
+                        case KT: // time
+                            //EI(ei_x_encode_ki_val(&data->x, int_));
+                            fprintf_i(outputfile_h, int_);
+                            break;
+                        case KV: // second
+                            //EI(ei_x_encode_ki_val(&data->x, int_));
+                            fprintf_i(outputfile_h, int_);
+                            break;
+                        case KU: // minute
+                            //EI(ei_x_encode_ki_val(&data->x, int_));
+                            fprintf_i(outputfile_h, int_);
+                            break;
+                        case KN: // timespan
+                            //EI(ei_x_encode_kj_val(&data->x, long_));
+                            fprintf_j(outputfile_h, long_);
+                            break;
+                        case KZ: // datetime
+                            //EI(ei_x_encode_datetime_as_now(&data->x, double_));
+                            fprintf_z(outputfile_h, double_);
+                            break;
+                        case KD: // date
+                            //EI(ei_x_encode_ki_val(&data->x, int_));
+                            fprintf_i(outputfile_h, int_);
+                            break;
+                        case KM: // month
+                            //EI(ei_x_encode_ki_val(&data->x, int_));
+                            fprintf_i(outputfile_h, int_);
+                            break;
+                        case KI: // int
+                            //EI(ei_x_encode_ki_val(&data->x, int_));
+                            fprintf_i(outputfile_h, int_);
+                            break;
+                        case KP: // timestamp
+                            //EI(ei_x_encode_timestamp_as_now(&data->x, long_));
+                            fprintf_p(outputfile_h, long_);
+                            break;
+                        case KJ: // long
+                            //EI(ei_x_encode_kj_val(&data->x, long_));
+                            fprintf_j(outputfile_h, long_);
+                            break;
+                        case KF: // float
+                            //EI(ei_x_encode_kf_val(&data->x, double_));
+                            fprintf_f(outputfile_h, double_);
+                            break;
+                        case KC: // char
+                            //EI(ei_x_encode_char(&data->x, char_));
+                            fprintf(outputfile_h, "%c", char_);
+                            break;
+                        case KE: // real
+                            //EI(ei_x_encode_kf_val(&data->x, float_));
+                            fprintf_f(outputfile_h, double_);
+                            break;
+                        case KH: // short
+                            //EI(ei_x_encode_ki_val(&data->x, short_));
+                            fprintf_i(outputfile_h, (int)short_);
+                            break;
+                        case KG: // byte
+                            //EI(ei_x_encode_char(&data->x, char_));
+                            fprintf_i(outputfile_h, (int)char_);
+                            break;
+                        case KB: // boolean
+                            if(char_) {
+                                //    EI(ei_x_encode_atom(&data->x, "true"));
+                                fwrite("true", 1, 4, outputfile_h);
+                            } else {
+                                //    EI(ei_x_encode_atom(&data->x, "false"));
+                                fwrite("false", 1, 5, outputfile_h);
+                            }
+                            break;
+                        case KS: // symbol
+                            // This typically won't be used since syms in a splayed
+                            // table should have an enumeration file (sym)
+                            if (int_ == 1024) {
+                                //    EI(ei_x_encode_atom(&data->x, "null"));
+                            } else {
+                                //    EI(ei_x_encode_binary(&data->x, buffer, int_));
+                                fprintf(outputfile_h, "%s", buffer);
+                            }
+                            break;
+                        case 0: // enum'd symbol
+                            if(int_ > 0 && int_ < sym->n) {
+                                //    const char *s = kS(sym)[int_];
+                                //    int len = strlen(s);
+                                //    LOG("dbnext symbol index %d %s, len %d\n",
+                                //            int_, s, (int)len);
+                                //    EI(ei_x_encode_binary(&data->x, s, len));
+                                fprintf(outputfile_h, "%s", kS(sym)[int_]);
+                            } else {
+                                //    // null symbol
+                                //    EI(ei_x_encode_atom(&data->x, "null"));
+                            }
+                            break;
+                        case 87: // special string type
+                            //LOG("dbnext string val %ld\n", long_);
+                            fptr = (FILE*)kJ(data_handle_column)[j];
 
-                        char* string_ = genq_alloc((sizeof(char))*(long_-pos));
-                        ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
-                        if(!ok) {
-                        //    EI(ei_x_encode_atom(&data->x, "null"));
-                            ok = 1;
-                        } else {
-                        //    EI(ei_x_encode_binary(&data->x, string_, long_-pos));
-                              fwrite(string_, 1, long_-pos, outputfile_h);
-                        }
-                        genq_free(string_);
+                            char* string_ = genq_alloc((sizeof(char))*(long_-pos));
+                            ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
+                            if(!ok) {
+                                //    EI(ei_x_encode_atom(&data->x, "null"));
+                                ok = 1;
+                            } else {
+                                //    EI(ei_x_encode_binary(&data->x, string_, long_-pos));
+                                fwrite(string_, 1, long_-pos, outputfile_h);
+                            }
+                            genq_free(string_);
 
-                        kJ(file_pos_column)[j] = long_;
+                            kJ(file_pos_column)[j] = long_;
 
-                        break;
-                    default:
-                        LOG("dbnext unhandled type in csv path %d\n", ktype);
-                        break;
+                            break;
+                        default:
+                            LOG("dbnext unhandled type in csv path %d\n", ktype);
+                            break;
+                    }
                 }
                 if(j+1 != column_name_column->n) {
                     fwrite(",", 1, 1, outputfile_h);
@@ -724,7 +734,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
             EI(ei_x_encode_atom(&data->x, kS(column_name_column)[j]));
 
             // HACK
-            if(str_ends_with(kS(column_name_column)[j], "private_data_expiry_0")) {
+            if(j == private_data_column_pos) {
                 EI(ei_x_encode_tuple_header(&data->x, 2));
                 EI(ei_x_encode_atom(&data->x, "binary"));
             }
