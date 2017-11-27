@@ -1051,14 +1051,13 @@ int q_get_disk_file_format(const unsigned char* filebytes, int size) {
 }
 
 int q_get_fptr_disk_file_format(FILE *fptr) {
-    const int hdr_buf_size = 9;
-    unsigned char hdr_buf[hdr_buf_size] = {0};
-    int read_bytes = fread(hdr_buf, 1, hdr_buf_size, fptr);
-    if (read_bytes < hdr_buf_size){
+    unsigned char hdr_buf[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    int read_bytes = fread(hdr_buf, 1, 9, fptr);
+    if (read_bytes < 9){
         return Q_DISK_ERROR;
     }
 
-    return q_get_disk_file_format(hdr_buf, hdr_buf_size);
+    return q_get_disk_file_format(hdr_buf, 9);
 }
 
 int q_get_fptr_ktype(FILE *fptr) {
