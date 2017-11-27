@@ -344,7 +344,8 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     K column_name_column = dict_entry(input, "column_name");
     K symdata = 0;
     int ktype = 0;
-    for(int i=0; i<filename_column->n; ++i) {
+    int i = 0;
+    for(i=0; i<filename_column->n; ++i) {
         LOG("dbopen reading %s\n", kS(filename_column)[i]);
         LOG("dbopen data %s\n", kS(column_data_column)[i]);
 
@@ -373,7 +374,8 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
                     HANDLE_ERROR("sym", 3);
                     return;
                 }
-                for(int j=0; j<50; ++j) {
+                int j = 0;
+                for(j=0; j<50; ++j) {
                     LOG("db open sym %s\n", kS(symdata)[j]);
                 }
             }
@@ -478,7 +480,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
     int return_data = 0==strcmp(return_data_k->s, "true");
     LOG("dbnext return_data is %d\n", return_data);
 
-    K filename_column = dict_entry(dbstate, "filename");
+    //K filename_column = dict_entry(dbstate, "filename");
     K file_handle_column = dict_entry(dbstate, "file_handle");
     K data_handle_column = dict_entry(dbstate, "data_handle");
     K column_type_column = dict_entry(dbstate, "column_type");
@@ -503,8 +505,8 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
     int i=0;
     for(i=0; i < num_records; ++i) {
-        for(int j=0; j < column_name_column->n; ++j) {
-            LOG("dbnext reading %s\n", kS(filename_column)[j]);
+        int j=0;
+        for(j=0; j < column_name_column->n; ++j) {
             LOG("dbnext data %s\n", kS(column_name_column)[j]);
             ktype = kJ(column_type_column)[j];
             fptr = (FILE*)kJ(file_handle_column)[j];
@@ -906,7 +908,8 @@ void q_dbclose(QWorkDbOp* data, QOpts* opts){
             
     K file_handle_column = dict_entry(dbstate, "file_handle");
     K data_handle_column = dict_entry(dbstate, "data_handle");
-    for(int i=0; i<file_handle_column->n; ++i) {
+    int i=0;
+    for(i=0; i<file_handle_column->n; ++i) {
         fptr = (FILE*)kJ(file_handle_column)[i];
         if(fptr != 0) {
             LOG("dbclose closing file %lld\n", (unsigned long long)fptr);
@@ -1107,7 +1110,8 @@ int q_ipc_create_sym(K* kbytes, const unsigned char* filebytes, int size) {
                 // types. the veclen in the file isn't reliable, sadly
                 if (type == KS) {
                     veclen = 0;
-                    for(int i=0; i<datasize; ++i) {
+                    int i=0;
+                    for(i=0; i<datasize; ++i) {
                         if(data[i] == 0) {
                             veclen++;
                         }
