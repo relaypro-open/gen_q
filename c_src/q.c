@@ -505,6 +505,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
     int i=0;
     for(i=0; i < num_records; ++i) {
+
         int j=0;
         for(j=0; j < column_name_column->n; ++j) {
             LOG("dbnext data %s\n", kS(column_name_column)[j]);
@@ -594,6 +595,10 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
             // WRITE DATA TO CSV
             if (outputfile_h != 0 && ok) {
+                if (j == 0) {
+                    fwrite("\n", 1, 1, outputfile_h);
+                }
+
                 if (j != private_data_column_pos) {
                     switch (ktype) {
                         case KT: // time
@@ -838,9 +843,6 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     EI(ei_x_encode_atom(&data->x, "null"));
                     break;
             }
-        }
-        if (outputfile_h != 0) {
-            fwrite("\n", 1, 1, outputfile_h);
         }
         if(!ok) {
             break;
