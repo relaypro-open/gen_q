@@ -593,7 +593,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
             }
 
             // WRITE DATA TO CSV
-            if (outputfile_h != 0) {
+            if (outputfile_h != 0 && ok) {
                 if (j != private_data_column_pos) {
                     switch (ktype) {
                         case KT: // time
@@ -717,6 +717,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
             }
 
             if(!return_data) {
+                if(!ok) break;
                 continue;
             }
 
