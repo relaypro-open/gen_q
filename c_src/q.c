@@ -388,10 +388,6 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
         }
     }
 
-    if (outputfile_h != 0 && csv_header) {
-        fwrite("\n", 1, 1, outputfile_h);
-    }
-
     if(symdata == 0) {
         HANDLE_ERROR("sym", 3);
         return;
