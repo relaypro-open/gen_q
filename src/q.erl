@@ -15,7 +15,7 @@
 
 -export([state/0, state/1]).
 
--export([dbopen/3, dbnext/2, dbclose/1]).
+-export([dbopen/4, dbnext/2, dbclose/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -172,9 +172,9 @@ eval(SvrRef, Handle, Expr) ->
 eval(SvrRef, Handle, Expr, Timeout) ->
     apply(SvrRef, Handle, Expr, ok, ok, Timeout).
 
-dbopen(Db, Part, Table) -> dbopen(?MODULE, Db, Part, Table).
-dbopen(SvrRef, Db, Part, Table) ->
-    gen_server:call(SvrRef, {dbopen, Db, Part, Table}, infinity).
+dbopen(Db, Part, Table, Opts) -> dbopen(?MODULE, Db, Part, Table, Opts).
+dbopen(SvrRef, Db, Part, Table, Opts) ->
+    gen_server:call(SvrRef, {dbopen, Db, Part, Table, Opts}, infinity).
 
 dbnext(State, N) -> dbnext(?MODULE, State, N).
 dbnext(SvrRef, State, N) ->
@@ -223,7 +223,7 @@ handle_call({decode_binary, Binary}, _From, State) ->
     do_call(State, {?FuncQDecodeBinary, [Binary]});
 handle_call({apply, Handle, Func, Types, Values}, _From, State) ->
     do_call(State, {?FuncQApply, [Handle, Func, {Types, Values}]});
-handle_call({dbopen, Db, Part, Table}, _From, State) ->
+handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
     DbPartPath = filename:join([Db, Part, Table]),
     case file:list_dir(DbPartPath) of
         {ok, Columns0} ->
@@ -256,18 +256,43 @@ handle_call({dbopen, Db, Part, Table}, _From, State) ->
             ColumnTypeC = lists:duplicate(length(FilenameC), -1),
             FilePosC = lists:duplicate(length(FilenameC), -1),
 
-            TableMeta = {table, {list, [{list, symbol},
-                     {list, symbol},
-                     {list, long},
-                     {list, long},
-                     {list, long},
-                     {list, long},
-                     {list, symbol}]}},
-            TableContent = {[filename, column_data, file_handle, data_handle,
-                      column_type, file_pos, column_name],
-                     [FilenameC, ColumnDataC, FileHandleC, DataHandleC,
-                      ColumnTypeC, FilePosC, ColumnNameC]},
-            DbState = {TableMeta, TableContent},
+            Outputfile = proplists:get_value(outputfile, Opts),
+            ReturnData = proplists:get_value(return_data, Opts, true),
+
+            InputMeta = {dict, {list, symbol},
+                               {list, [
+                                       symbol, % outputfile
+                                       symbol, % return_data
+                                       {list, symbol}, % FilenameC
+                                       {list, symbol}, % ColumnDataC
+                                       {list, long}, % FileHandleC
+                                       {list, long}, % DataHandleC
+                                       {list, long}, % ColumnTypeC
+                                       {list, long}, % FilePosC
+                                       {list, symbol} % ColumnNameC
+                                      ]}},
+            InputContent = {[outputfile,
+                             return_data,
+                             filename,
+                             column_data,
+                             file_handle,
+                             data_handle,
+                             column_type,
+                             file_pos,
+                             column_name
+                            ],
+                            [Outputfile,
+                             ReturnData,
+                             FilenameC,
+                             ColumnDataC,
+                             FileHandleC,
+                             DataHandleC,
+                             ColumnTypeC,
+                             FilePosC,
+                             ColumnNameC
+                            ]},
+
+            DbState = {InputMeta, InputContent},
 
             do_call(State, {?FuncQDbOpen, [0, DbState]});
         Error ->

@@ -257,7 +257,6 @@ K db_read_sym_file(const char* sym_file) {
     int fd = open(sym_file, O_RDONLY);
     LOG("dbopen sym fd %d\n", fd);
     fstat(fd, &s);
-    LOG("dbopen sym status %d\n", status);
     int size = s.st_size;
     LOG("dbopen sym size %d\n", size);
 
@@ -298,28 +297,37 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
 
     // Decode the input table which contains all the file paths necessary
     // for reading this db partition.
-    K table;
+    K input;
     int ei_res = ei_decode_k(data->buff, &data->types_index,
-            &data->values_index, &table, opts);
+            &data->values_index, &input, opts);
     if(ei_res < 0) {
         HANDLE_ERROR("ei_decode_k", 11);
         LOG("dbopen ei error - %s\n", "ei_decode_k");
         return;
     }
 
-    // The following block examines all files int he input table:
+    K outputfile = dict_entry(input, "outputfile");
+    FILE *outputfile_h = 0;
+    if(0!=strcmp(outputfile->s, "undefined")) {
+        outputfile_h = fopen(outputfile->s, "w+");
+    }
+
+    K return_data = dict_entry(input, "return_data");
+
+    // The following block examines all files in the input table:
     //   1. Opens a file handle to each
     //   2. For the sym file, loads it into memory in its entirety
     //   3. Discovers the k-type of each file
     //   4. Initializes the file pos for each file so that reading data
     //      can follow.
     FILE *fptr;
-    K filename_column = table_column(table, "filename");
-    K column_data_column = table_column(table, "column_data");
-    K file_handle_column = table_column(table, "file_handle");
-    K data_handle_column = table_column(table, "data_handle");
-    K column_type_column = table_column(table, "column_type");
-    K file_pos_column = table_column(table, "file_pos");
+    K filename_column = dict_entry(input, "filename");
+    K column_data_column = dict_entry(input, "column_data");
+    K file_handle_column = dict_entry(input, "file_handle");
+    K data_handle_column = dict_entry(input, "data_handle");
+    K column_type_column = dict_entry(input, "column_type");
+    K file_pos_column = dict_entry(input, "file_pos");
+    K column_name_column = dict_entry(input, "column_name");
     K symdata = 0;
     int ktype = 0;
     for(int i=0; i<filename_column->n; ++i) {
@@ -357,16 +365,38 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
         }
     }
 
+    if(symdata == 0) {
+        HANDLE_ERROR("sym", 3);
+        return;
+    }
+
     // The following section organizes all the data into a dbstate object,
     // which is a dict:
-    //      table: The input table, file handles, file positions, etc
     //      sym: The sym file in memory
     // The reference to this object is stored in the QWorkDbOp and given
     // back to the Erlang caller as the state.
-    K r_key = ktn(KS, 2);
-    kS(r_key)[0]=ss("table");
-    kS(r_key)[1]=ss("sym");
-    K r_val = knk(2, table, symdata);
+    K r_key = ktn(KS, 10);
+    kS(r_key)[0]=ss("outputfile");
+    kS(r_key)[1]=ss("return_data");
+    kS(r_key)[2]=ss("filename");
+    kS(r_key)[3]=ss("column_data");
+    kS(r_key)[4]=ss("file_handle");
+    kS(r_key)[5]=ss("data_handle");
+    kS(r_key)[6]=ss("column_type");
+    kS(r_key)[7]=ss("file_pos");
+    kS(r_key)[8]=ss("column_name");
+    kS(r_key)[9]=ss("sym");
+    K r_val = knk(10, 
+            kj((unsigned long long)outputfile_h),
+            return_data,
+            filename_column,
+            column_data_column,
+            file_handle_column,
+            data_handle_column,
+            column_type_column,
+            file_pos_column,
+            column_name_column,
+            symdata);
     K dbstate = xD(r_key, r_val);
     data->handle = (unsigned long long)dbstate;
 
@@ -406,26 +436,27 @@ void q_dbnext(QWorkDbOp* data, QOpts* opts){
 int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
     K dbstate = (K)data->n;
     if (dbstate == 0) {
+        LOG("dbnext ERROR state %d\n", 0);
         HANDLE_ERROR("nostate", 7);
-        return -1;
-    }
-    K table = dict_entry(dbstate, "table");
-    if(table == 0) {
-        HANDLE_ERROR("table", 5);
         return -1;
     }
     K sym = dict_entry(dbstate, "sym");
     if(sym == 0) {
+        LOG("dbnext ERROR sym %d\n", 0);
         HANDLE_ERROR("sym", 3);
         return -1;
     }
-    //K filename_column = table_column(table, "filename");
-    //K column_data_column = table_column(table, "column_data");
-    K file_handle_column = table_column(table, "file_handle");
-    K data_handle_column = table_column(table, "data_handle");
-    K column_type_column = table_column(table, "column_type");
-    K file_pos_column = table_column(table, "file_pos");
-    K column_name_column = table_column(table, "column_name");
+    K return_data_k = dict_entry(dbstate, "return_data");
+    LOG("dbnext return_data_k is %s\n", return_data_k->s);
+    int return_data = 0==strcmp(return_data_k->s, "true");
+    LOG("dbnext return_data is %d\n", return_data);
+
+    K filename_column = dict_entry(dbstate, "filename");
+    K file_handle_column = dict_entry(dbstate, "file_handle");
+    K data_handle_column = dict_entry(dbstate, "data_handle");
+    K column_type_column = dict_entry(dbstate, "column_type");
+    K file_pos_column = dict_entry(dbstate, "file_pos");
+    K column_name_column = dict_entry(dbstate, "column_name");
     int ktype = 0;
     FILE *fptr;
     long long_ = 0;
@@ -440,12 +471,12 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
     EI(ei_x_new(&data->x));
     data->has_x = 1;
-    //EI(ei_x_encode_list_header(&data->x, num_records));
 
-    for(int i=0; i < num_records; ++i) {
+    int i=0;
+    for(i=0; i < num_records; ++i) {
         for(int j=0; j < column_name_column->n; ++j) {
             LOG("dbnext reading %s\n", kS(filename_column)[j]);
-            LOG("dbnext data %s\n", kS(column_data_column)[j]);
+            LOG("dbnext data %s\n", kS(column_name_column)[j]);
             ktype = kJ(column_type_column)[j];
             fptr = (FILE*)kJ(file_handle_column)[j];
 
@@ -522,6 +553,10 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                 default:
                     LOG("dbnext unhandled type %d\n", ktype);
                     break;
+            }
+
+            if(!return_data) {
+                continue;
             }
 
             if(ok && j == 0) {
@@ -646,7 +681,11 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
         }
     }
 
-    EI(ei_x_encode_empty_list(&data->x));
+    if(return_data) {
+        EI(ei_x_encode_empty_list(&data->x));
+    } else {
+        EI(ei_x_encode_long(&data->x, i));
+    }
     return 0;
 }
 
@@ -660,13 +699,15 @@ void q_dbclose(QWorkDbOp* data, QOpts* opts){
         HANDLE_ERROR("nostate", 7);
         return;
     }
-    K table = dict_entry(dbstate, "table");
-    if(table == 0) {
-        HANDLE_ERROR("table", 5);
-        return;
+    K outputfile_h = dict_entry(dbstate, "outputfile");
+    if(outputfile_h != 0 &&
+            outputfile_h->j != 0) {
+        LOG("dbclose closing output file %lld\n", outputfile_h->j);
+        fclose((FILE*)outputfile_h->j);
     }
-    K file_handle_column = table_column(table, "file_handle");
-    K data_handle_column = table_column(table, "data_handle");
+            
+    K file_handle_column = dict_entry(dbstate, "file_handle");
+    K data_handle_column = dict_entry(dbstate, "data_handle");
     for(int i=0; i<file_handle_column->n; ++i) {
         fptr = (FILE*)kJ(file_handle_column)[i];
         if(fptr != 0) {

@@ -249,12 +249,12 @@ gen_q_db_op_test_() ->
              [
               fun() ->
                       {ok, H1, {symbol, ok}} = q:dbopen("/mnt/data/kdb/hdb_date",
-                                                    "2014.04.22", "cdr"),
+                                                    "2014.04.22", "cdr", []),
                       {ok, 0, [_]} = q:dbnext(H1, 1),
                       {ok, 0, {symbol, ok}} = q:dbclose(H1),
 
                       {ok, H2, {symbol, ok}} = q:dbopen("/mnt/data/kdb/hdb_date",
-                                                    "2017.11.01", "icdr"),
+                                                    "2017.11.01", "icdr", []),
                       {ok, 0, List1} = q:dbnext(H2, 100),
                       {ok, 0, List2} = q:dbnext(H2, 100),
                       {ok, 0, List3} = q:dbnext(H2, 100),
@@ -266,6 +266,23 @@ gen_q_db_op_test_() ->
                                                            List4, List5, List6,
                                                            List7] ]),
                       {ok, 0, {symbol, ok}} = q:dbclose(H2)
+              end
+             ]
+     end}.
+
+gen_q_db_op2_test_() ->
+    {setup,
+     fun setup_db_op/0,
+     fun teardown_db_op/1,
+     fun(_) ->
+             [
+              fun() ->
+                      {ok, H1, {symbol, ok}} = q:dbopen("/mnt/data/kdb/hdb_date",
+                                                    "2014.04.22", "cdr",
+                                                    [{outputfile, "/tmp/gen_q_output.csv"},
+                                                     {return_data, false}]),
+                      {ok, 0, 1} = q:dbnext(H1, 1),
+                      {ok, 0, {symbol, ok}} = q:dbclose(H1)
               end
              ]
      end}.
