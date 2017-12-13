@@ -280,6 +280,8 @@ gen_q_db_op2_test_() ->
                       {ok, H1, {symbol, ok}} = q:dbopen("/mnt/data/kdb/hdb_date",
                                                     "2014.04.22", "cdr",
                                                     [{outputfile, "/tmp/gen_q_output.csv"},
+                                                     {outputfile_append, true},
+                                                     {csv_header, false},
                                                      {return_data, false}]),
                       {ok, 0, 10} = q:dbnext(H1, 10),
                       {ok, 0, {symbol, ok}} = q:dbclose(H1)

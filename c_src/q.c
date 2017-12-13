@@ -49,7 +49,18 @@ void fprintf_f(FILE *fptr, double d);
 void fprintf_z(FILE *fptr, double d);
 void fprintf_p(FILE *fptr, long long j);
 
+int sprintf_i(char *buf, int i);
+int sprintf_j(char *buf, long long j);
+int sprintf_f(char *buf, double d);
+int sprintf_z(char *buf, double d);
+int sprintf_p(char *buf, long long j);
+
 K global_sym = 0;
+
+// YO! Not thread safe!
+#define JSON_BUFFER_SIZE 1024*1024*32
+char json[1024*1024*32];
+int jind_escape_hatch = (JSON_BUFFER_SIZE * 9) / 10;
 
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
@@ -499,9 +510,14 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
     int private_data_column_pos = -1;
 
+#ifndef DBOP_EI
+    int jind = 0;
+#endif
+
     EI(ei_x_new(&data->x));
     data->has_x = 1;
 
+    jind += sprintf(json + jind, "[");
     int i=0;
     for(i=0; i < num_records; ++i) {
 
@@ -601,71 +617,54 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                 if (j != private_data_column_pos) {
                     switch (ktype) {
                         case KT: // time
-                            //EI(ei_x_encode_ki_val(&data->x, int_));
                             fprintf_i(outputfile_h, int_);
                             break;
                         case KV: // second
-                            //EI(ei_x_encode_ki_val(&data->x, int_));
                             fprintf_i(outputfile_h, int_);
                             break;
                         case KU: // minute
-                            //EI(ei_x_encode_ki_val(&data->x, int_));
                             fprintf_i(outputfile_h, int_);
                             break;
                         case KN: // timespan
-                            //EI(ei_x_encode_kj_val(&data->x, long_));
                             fprintf_j(outputfile_h, long_);
                             break;
                         case KZ: // datetime
-                            //EI(ei_x_encode_datetime_as_now(&data->x, double_));
                             fprintf_z(outputfile_h, double_);
                             break;
                         case KD: // date
-                            //EI(ei_x_encode_ki_val(&data->x, int_));
                             fprintf_i(outputfile_h, int_);
                             break;
                         case KM: // month
-                            //EI(ei_x_encode_ki_val(&data->x, int_));
                             fprintf_i(outputfile_h, int_);
                             break;
                         case KI: // int
-                            //EI(ei_x_encode_ki_val(&data->x, int_));
                             fprintf_i(outputfile_h, int_);
                             break;
                         case KP: // timestamp
-                            //EI(ei_x_encode_timestamp_as_now(&data->x, long_));
                             fprintf_p(outputfile_h, long_);
                             break;
                         case KJ: // long
-                            //EI(ei_x_encode_kj_val(&data->x, long_));
                             fprintf_j(outputfile_h, long_);
                             break;
                         case KF: // float
-                            //EI(ei_x_encode_kf_val(&data->x, double_));
                             fprintf_f(outputfile_h, double_);
                             break;
                         case KC: // char
-                            //EI(ei_x_encode_char(&data->x, char_));
                             fprintf(outputfile_h, "%c", char_);
                             break;
                         case KE: // real
-                            //EI(ei_x_encode_kf_val(&data->x, float_));
                             fprintf_f(outputfile_h, double_);
                             break;
                         case KH: // short
-                            //EI(ei_x_encode_ki_val(&data->x, short_));
                             fprintf_i(outputfile_h, (int)short_);
                             break;
                         case KG: // byte
-                            //EI(ei_x_encode_char(&data->x, char_));
                             fprintf_i(outputfile_h, (int)char_);
                             break;
                         case KB: // boolean
                             if(char_) {
-                                //    EI(ei_x_encode_atom(&data->x, "true"));
                                 fwrite("true", 1, 4, outputfile_h);
                             } else {
-                                //    EI(ei_x_encode_atom(&data->x, "false"));
                                 fwrite("false", 1, 5, outputfile_h);
                             }
                             break;
@@ -673,36 +672,24 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                             // This typically won't be used since syms in a splayed
                             // table should have an enumeration file (sym)
                             if (int_ == 1024) {
-                                //    EI(ei_x_encode_atom(&data->x, "null"));
                             } else {
-                                //    EI(ei_x_encode_binary(&data->x, buffer, int_));
                                 fprintf(outputfile_h, "%s", buffer);
                             }
                             break;
                         case 0: // enum'd symbol
                             if(int_ > 0 && int_ < sym->n) {
-                                //    const char *s = kS(sym)[int_];
-                                //    int len = strlen(s);
-                                //    LOG("dbnext symbol index %d %s, len %d\n",
-                                //            int_, s, (int)len);
-                                //    EI(ei_x_encode_binary(&data->x, s, len));
                                 fprintf(outputfile_h, "%s", kS(sym)[int_]);
                             } else {
-                                //    // null symbol
-                                //    EI(ei_x_encode_atom(&data->x, "null"));
                             }
                             break;
                         case 87: // special string type
-                            //LOG("dbnext string val %ld\n", long_);
                             fptr = (FILE*)kJ(data_handle_column)[j];
 
                             char* string_ = genq_alloc((sizeof(char))*(long_-pos));
                             ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
                             if(!ok) {
-                                //    EI(ei_x_encode_atom(&data->x, "null"));
                                 ok = 1;
                             } else {
-                                //    EI(ei_x_encode_binary(&data->x, string_, long_-pos));
                                 fwrite(string_, 1, long_-pos, outputfile_h);
                             }
                             genq_free(string_);
@@ -725,6 +712,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                 continue;
             }
 
+#ifdef DBOP_EI
             // WRITE DATA TO EI
             if(ok && j == 0) {
                 EI(ei_x_encode_list_header(&data->x, 1));
@@ -842,17 +830,155 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     EI(ei_x_encode_atom(&data->x, "null"));
                     break;
             }
+#else
+            // WRITE DATA TO JSON BUFF
+            if(ok && i == 0 && j == 0) {
+                jind += sprintf(json + jind, "{");
+            } else if (ok && i > 0 && j == 0) {
+                jind += sprintf(json + jind, ",{");
+            } else if(!ok && j == 0) {
+                break;
+            } else if(!ok) {
+                // We already started the output, can't back out now!
+                jind += sprintf(json + jind, "\"%s\":null", kS(column_name_column)[j]);
+                continue;
+            } else if (ok) {
+                jind += sprintf(json + jind, ",");
+            }
+
+            jind += sprintf(json + jind, "\"%s\":", kS(column_name_column)[j]);
+
+            // HACK
+            int is_reql_bin = 0;
+            if(j == private_data_column_pos) {
+                jind += sprintf(json + jind, "{\"$reql_type$\":\"BINARY\",\"data\":");
+                is_reql_bin = 1;
+            }
+
+            switch (ktype) {
+                case KT: // time
+                    jind += sprintf_i(json + jind, int_);
+                    break;
+                case KV: // second
+                    jind += sprintf_i(json + jind, int_);
+                    break;
+                case KU: // minute
+                    jind += sprintf_i(json + jind, int_);
+                    break;
+                case KN: // timespan
+                    jind += sprintf_j(json + jind, long_);
+                    break;
+                case KZ: // datetime
+                    jind += sprintf_z(json + jind, double_);
+                    break;
+                case KD: // date
+                    jind += sprintf_i(json + jind, int_);
+                    break;
+                case KM: // month
+                    jind += sprintf_i(json + jind, int_);
+                    break;
+                case KI: // int
+                    jind += sprintf_i(json + jind, int_);
+                    break;
+                case KP: // timestamp
+                    jind += sprintf_p(json + jind, long_);
+                    break;
+                case KJ: // long
+                    jind += sprintf_j(json + jind, long_);
+                    break;
+                case KF: // float
+                    jind += sprintf_f(json + jind, double_);
+                    break;
+                case KC: // char
+                    jind += sprintf(json + jind, "\"%c\"", char_);
+                    break;
+                case KE: // real
+                    jind += sprintf_f(json + jind, double_);
+                    break;
+                case KH: // short
+                    jind += sprintf_i(json + jind, (int)short_);
+                    break;
+                case KG: // byte
+                    jind += sprintf_i(json + jind, (int)char_);
+                    break;
+                case KB: // boolean
+                    if(char_) {
+                        jind += sprintf(json + jind, "true");
+                    } else {
+                        jind += sprintf(json + jind, "false");
+                    }
+                    break;
+                case KS: // symbol
+                    // This typically won't be used since syms in a splayed
+                    // table should have an enumeration file (sym)
+                    if (int_ == 1024) {
+                        jind += sprintf(json + jind, "null");
+                    } else {
+                        jind += sprintf(json + jind, "\"%s\"", buffer);
+                    }
+                    break;
+                case 0: // enum'd symbol
+                    if(int_ > 0 && int_ < sym->n) {
+                        jind += sprintf(json + jind, "\"%s\"", kS(sym)[int_]);
+                    } else {
+                        jind += sprintf(json + jind, "null");
+                    }
+                    break;
+                case 87: // special string type
+                    fptr = (FILE*)kJ(data_handle_column)[j];
+
+                    char* string_ = genq_alloc(1+(sizeof(char))*(long_-pos));
+                    ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
+                    string_[long_-pos] = 0;
+                    if(!ok) {
+                        jind += sprintf(json + jind, "null");
+                        ok = 1;
+                    } else {
+                        jind += sprintf(json + jind, "\"%s\"", string_);
+                    }
+                    if(is_reql_bin) {
+                        jind += sprintf(json + jind, "}");
+                    }
+                    genq_free(string_);
+
+                    kJ(file_pos_column)[j] = long_;
+
+                    break;
+                default:
+                    LOG("dbnext unhandled type in json path %d\n", ktype);
+                    break;
+            }
+#endif
         }
-        if(!ok) {
+#ifndef DCOP_EI
+        if(ok) {
+            jind += sprintf(json + jind, "}");
+        } else {
             break;
         }
+
+        if(jind >= jind_escape_hatch) {
+            break;
+        }
+#endif
     }
 
+#ifdef DBOP_EI
     if(return_data) {
         EI(ei_x_encode_empty_list(&data->x));
     } else {
         EI(ei_x_encode_long(&data->x, i));
     }
+#else
+    if(return_data) {
+        jind += sprintf(json + jind, "]");
+
+        EI(ei_x_encode_binary(&data->x, json, jind));
+    } else {
+        EI(ei_x_encode_long(&data->x, i));
+    }
+#endif
+
     return 0;
 }
 
@@ -864,12 +990,28 @@ void fprintf_i(FILE *fptr, int i) {
     fprintf(fptr, "%d", i);
 }
 
+int sprintf_i(char *buf, int i) {
+    if (i == ni ||
+            i == wi) {
+        return sprintf(buf, "null");
+    }
+    return sprintf(buf, "%d", i);
+}
+
 void fprintf_j(FILE *fptr, long long j) {
     if (j == nj ||
             j == wj) {
         return;
     }
     fprintf(fptr, "%lld", j);
+}
+
+int sprintf_j(char *buf, long long j) {
+    if (j == nj ||
+            j == wj) {
+        return sprintf(buf, "null");
+    }
+    return sprintf(buf, "%lld", j);
 }
 
 void fprintf_f(FILE *fptr, double d) {
@@ -879,16 +1021,37 @@ void fprintf_f(FILE *fptr, double d) {
     fprintf(fptr, "%f", d);
 }
 
+int sprintf_f(char *buf, double d) {
+    if(d == nh || d == wh || d!=d) {
+        return sprintf(buf, "null");
+    }
+    return sprintf(buf, "%f", d);
+}
+
 void fprintf_z(FILE *fptr, double d) {
     if(d == nf || d == wf || d != d) return;
     long long unix_micros = datetime_to_unix_micros(d);
     fprintf_j(fptr, unix_micros);
 }
 
+int sprintf_z(char *buf, double d) {
+    if(d == nf || d == wf || d != d) return sprintf(buf, "null");
+    long long unix_micros = datetime_to_unix_micros(d);
+    return sprintf(buf, "{\"$reql_type$\":\"TIME\",\"epoch_time\":%f,\"timezone\":\"+00:00\"}",
+            ((double)unix_micros) / (1000.0*1000.0));
+}
+
 void fprintf_p(FILE *fptr, long long j) {
     if(j == nj || j == wj) return;
     long long unix_micros = timestamp_to_unix_micros(j);
     fprintf_j(fptr, unix_micros);
+}
+
+int sprintf_p(char *buf, long long j) {
+    if(j == nj || j == wj) return sprintf(buf, "null");
+    long long unix_micros = timestamp_to_unix_micros(j);
+    return sprintf(buf, "{\"$reql_type$\":\"TIME\",\"epoch_time\":%f,\"timezone\":\"+00:00\"}",
+            ((double)unix_micros) / (1000.0*1000.0));
 }
 
 void q_dbclose(QWorkDbOp* data, QOpts* opts){
