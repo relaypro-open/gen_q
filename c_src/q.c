@@ -56,6 +56,8 @@ int sprintf_z(char *buf, double d);
 int sprintf_p(char *buf, long long j);
 unsigned char * genq_base64_encode(const unsigned char *src, size_t len, size_t *out_len);
 
+unsigned char * escape_quotes(const unsigned char *src, size_t len, size_t *out_len);
+
 K global_sym = 0;
 
 // YO! Not thread safe!
@@ -936,13 +938,25 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     unsigned char* string_ = genq_alloc(1+(sizeof(unsigned char))*(long_-pos));
                     ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
                     string_[long_-pos] = 0;
+
+                    // We're going to be embedding this string in a json field,
+                    // so we need to escape any quotes marks. If this function
+                    // finds any, it will return a new string, and we'll replace
+                    // string_ with it. Otherwise, do nothing
+                    size_t_ = long_-pos;
+                    unsigned char* escaped = escape_quotes(string_, size_t_, &size_t_);
+                    if(escaped) {
+                        genq_free(string_);
+                        string_ = escaped;
+                    }
+
                     if(!ok) {
                         jind += sprintf(json + jind, "null");
                         ok = 1;
                     } else if (is_reql_bin) {
-                        if(long_-pos > 0) {
-                            LOG("dbnext reql bin size %lld\n", long_-pos);
-                            b64 = genq_base64_encode(string_, (size_t)long_-pos, &size_t_);
+                        if(size_t_ > 0) {
+                            LOG("dbnext reql bin size %lld\n", size_t_);
+                            b64 = genq_base64_encode(string_, size_t_, &size_t_);
                             if(b64) {
                                 jind += sprintf(json + jind, "\"%s\"}", b64);
                             } else {
@@ -1414,4 +1428,37 @@ unsigned char * genq_base64_encode(const unsigned char *src, size_t len,
 	if (out_len)
 		*out_len = pos - out;
 	return out;
+}
+
+unsigned char * escape_quotes(const unsigned char *src, size_t len, size_t *out_len) {
+    int *pos = genq_alloc(sizeof(int)*len);
+    int count = 0;
+    int i;
+    for(i=0; i<len; ++i) {
+        LOG("escape quotes looking at pos %d\n", i);
+        if(src[i] == '\"') {
+            LOG("escape quotes found at pos %d\n", i);
+            pos[count++] = i;
+        }
+    }
+    if(count == 0) {
+        genq_free(pos);
+        return 0;
+    }
+    unsigned char *out = genq_alloc(sizeof(unsigned char)*(1+len+count));
+    int pos_ind = 0;
+    for(i=0; i<len; ++i) {
+        if(pos[pos_ind] == i) {
+            out[i+pos_ind] = '\\';
+            out[i+pos_ind+1] = '\"';
+            ++pos_ind;
+        } else {
+            out[i+pos_ind] = src[i];
+        }
+    }
+    out[len+count] = '\0';
+    genq_free(pos);
+    *out_len = len+count;
+    LOG("escape quotes returning %s\n", out);
+    return out;
 }
