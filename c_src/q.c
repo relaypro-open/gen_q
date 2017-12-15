@@ -935,19 +935,29 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                 case 87: // special string type
                     fptr = (FILE*)kJ(data_handle_column)[j];
 
-                    unsigned char* string_ = genq_alloc(1+(sizeof(unsigned char))*(long_-pos));
+                    unsigned char* string_ = genq_alloc((sizeof(unsigned char))*(1+long_-pos));
                     ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
                     string_[long_-pos] = 0;
-
-                    // We're going to be embedding this string in a json field,
-                    // so we need to escape any quotes marks. If this function
-                    // finds any, it will return a new string, and we'll replace
-                    // string_ with it. Otherwise, do nothing
                     size_t_ = long_-pos;
-                    unsigned char* escaped = escape_quotes(string_, size_t_, &size_t_);
-                    if(escaped) {
-                        genq_free(string_);
-                        string_ = escaped;
+
+                    if(ok) {
+                        // We're going to be embedding this string in a json field,
+                        // so we need to escape any quotes marks. If this function
+                        // finds any, it will return a new string, and we'll replace
+                        // string_ with it. Otherwise, do nothing
+                        unsigned char* escaped = escape_quotes(string_, size_t_, &size_t_);
+                        if(escaped) {
+                            genq_free(string_);
+                            string_ = escaped;
+                        }
+                    }
+
+                    if(string_[size_t_-1] == '\\') {
+                        // A string ending in a backslash will screw up our
+                        // json object. There are surely other cases that would
+                        // break us too, but this one is provided as a sanity
+                        // check.
+                        ok = 0;
                     }
 
                     if(!ok) {
