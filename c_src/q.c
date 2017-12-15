@@ -961,7 +961,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     }
 
                     if(!ok && is_reql_bin) {
-                        jind += sprintf(json + jind, "null}");
+                        jind += sprintf(json + jind, "\"\"}");
                         ok = 1;
                     } else if(!ok) {
                         jind += sprintf(json + jind, "null");
