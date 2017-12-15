@@ -940,7 +940,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     string_[long_-pos] = 0;
                     size_t_ = long_-pos;
 
-                    if(ok) {
+                    if(ok && !is_reql_bin) {
                         // We're going to be embedding this string in a json field,
                         // so we need to escape any quotes marks. If this function
                         // finds any, it will return a new string, and we'll replace
@@ -960,7 +960,10 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                         ok = 0;
                     }
 
-                    if(!ok) {
+                    if(!ok && is_reql_bin) {
+                        jind += sprintf(json + jind, "null}");
+                        ok = 1;
+                    } else if(!ok) {
                         jind += sprintf(json + jind, "null");
                         ok = 1;
                     } else if (is_reql_bin) {
@@ -990,7 +993,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
             }
 #endif
         }
-#ifndef DCOP_EI
+#ifndef DBOP_EI
         if(ok) {
             jind += sprintf(json + jind, "}");
         } else {
