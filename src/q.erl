@@ -2,7 +2,9 @@
 -behavior(gen_server).
 
 %% External exports
--export([start/0, start/1, start/2, start_link/0, start_link/1, start_link/2, stop/0, stop/1]).
+-export([start/0, start/1, start/2,
+         start_link/0, start_link/1, start_link/2,
+         stop/0, stop/1]).
 
 %% API functions
 -export([hopen/4, hopen/5,
@@ -52,7 +54,12 @@ start(Options) ->
 start(ServerName, Options) ->
     case load_driver() of
         ok ->
-            gen_server:start(ServerName, ?MODULE, Options, []);
+            case ServerName of
+                undefined ->
+                    gen_server:start(?MODULE, Options, []);
+                _ ->
+                    gen_server:start(ServerName, ?MODULE, Options, [])
+            end;
         {error, Error} ->
             {error, Error}
     end.
@@ -88,7 +95,12 @@ start_link(Options) ->
 start_link(ServerName, Options) ->
     case load_driver() of
         ok ->
-            gen_server:start_link(ServerName, ?MODULE, Options, []);
+            case ServerName of
+                undefined ->
+                    gen_server:start_link(?MODULE, Options, []);
+                _ ->
+                    gen_server:start_link(ServerName, ?MODULE, Options, [])
+            end;
         {error, Error} ->
             {error, Error}
     end.
