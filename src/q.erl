@@ -15,7 +15,7 @@
 
 -export([state/0, state/1]).
 
--export([dbopen/4, dbnext/2, dbclose/1]).
+-export([dbopen/4, dbopen/5, dbnext/2, dbnext/3, dbclose/1, dbclose/2]).
 
 %% gen_server callbacks
 -export([init/1,
