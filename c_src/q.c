@@ -1111,6 +1111,7 @@ void q_dbclose(QWorkDbOp* data, QOpts* opts){
     if(outputfile_h != 0 &&
             outputfile_h->j != 0) {
         LOG("dbclose closing output file %lld\n", outputfile_h->j);
+        fflush((FILE*)outputfile_h->j);
         fclose((FILE*)outputfile_h->j);
     }
             
