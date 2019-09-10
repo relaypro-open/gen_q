@@ -1112,6 +1112,8 @@ void q_dbclose(QWorkDbOp* data, QOpts* opts){
             outputfile_h->j != 0) {
         LOG("dbclose closing output file %lld\n", outputfile_h->j);
         fflush((FILE*)outputfile_h->j);
+        int fd = fileno((FILE*)outputfile_h->j);
+        fsync(fd);
         fclose((FILE*)outputfile_h->j);
     }
             
