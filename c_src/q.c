@@ -23,6 +23,7 @@
 #define Q_DISK_SYMENUM 2
 #define Q_DISK_STRDATA 3
 #define Q_DISK_ERROR -1
+#define HARDCODED_KEY_GENERATION_MAGIC_NUMBER 65536
 
 int ei_x_encode_apply_result(QWorkApply* data, K r, QOpts* opts);
 int ei_x_encode_dbop_result(QWorkDbOp* data, K r, QOpts* opts);
@@ -59,11 +60,6 @@ unsigned char * genq_base64_encode(const unsigned char *src, size_t len, size_t 
 unsigned char * escape_quotes(const unsigned char *src, size_t len, size_t *out_len);
 
 K global_sym = 0;
-
-// YO! Not thread safe!
-#define JSON_BUFFER_SIZE 1024*1024*32
-char json[1024*1024*32];
-int jind_escape_hatch = (JSON_BUFFER_SIZE * 9) / 10;
 
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
@@ -264,6 +260,16 @@ int ei_x_encode_decodebinary_result(QWorkDecodeBinary* data, K r, QOpts* opts) {
     return 0;
 }
 
+int str_starts_with(const char *str, const char *prefix) {
+    if(!str || !prefix)
+        return 0;
+    size_t lenstr = strlen(str);
+    size_t lenprefix = strlen(prefix);
+    if (lenprefix > lenstr)
+        return 0;
+    return strncmp(str, prefix, lenprefix) == 0;
+}
+
 int str_ends_with(const char *str, const char *suffix) {
     if (!str || !suffix)
         return 0;
@@ -333,16 +339,20 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     K outputfile_append_k = dict_entry(input, "outputfile_append");
     int outputfile_append = 0 == strcmp(outputfile_append_k->s, "true");
     if(0!=strcmp(outputfile->s, "undefined")) {
-        if (outputfile_append) 
+        if (outputfile_append) {
             outputfile_h = fopen(outputfile->s, "a+");
-        else
+            fwrite("\n", 1, 1, outputfile_h);
+        } else {
             outputfile_h = fopen(outputfile->s, "w+");
+        }
     }
 
     K csv_header_k = dict_entry(input, "csv_header");
     int csv_header = 0 == strcmp(csv_header_k->s, "true");
 
     K return_data = dict_entry(input, "return_data");
+
+    K generate_key_list = dict_entry(input, "generate_key");
 
     // The following block examines all files in the input table:
     //   1. Opens a file handle to each
@@ -372,6 +382,12 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
             fwrite(kS(column_name_column)[i], 1, strlen(kS(column_name_column)[i]), outputfile_h);
             if(i+1 != filename_column->n) {
                 fwrite(",", 1, 1, outputfile_h);
+            } else if(generate_key_list->n > 0) {
+                fwrite(",__key__", 1, 8, outputfile_h);
+            }
+
+            if(i+1 == filename_column->n) {
+                fwrite("\n", 1, 1, outputfile_h);
             }
         }
 
@@ -415,20 +431,22 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     //      sym: The sym file in memory
     // The reference to this object is stored in the QWorkDbOp and given
     // back to the Erlang caller as the state.
-    K r_key = ktn(KS, 10);
+    K r_key = ktn(KS, 11);
     kS(r_key)[0]=ss("outputfile");
     kS(r_key)[1]=ss("return_data");
-    kS(r_key)[2]=ss("filename");
-    kS(r_key)[3]=ss("column_data");
-    kS(r_key)[4]=ss("file_handle");
-    kS(r_key)[5]=ss("data_handle");
-    kS(r_key)[6]=ss("column_type");
-    kS(r_key)[7]=ss("file_pos");
-    kS(r_key)[8]=ss("column_name");
-    kS(r_key)[9]=ss("sym");
-    K r_val = knk(10, 
+    kS(r_key)[2]=ss("generate_key");
+    kS(r_key)[3]=ss("filename");
+    kS(r_key)[4]=ss("column_data");
+    kS(r_key)[5]=ss("file_handle");
+    kS(r_key)[6]=ss("data_handle");
+    kS(r_key)[7]=ss("column_type");
+    kS(r_key)[8]=ss("file_pos");
+    kS(r_key)[9]=ss("column_name");
+    kS(r_key)[10]=ss("sym");
+    K r_val = knk(11, 
             kj((unsigned long long)outputfile_h),
             return_data,
+            generate_key_list,
             filename_column,
             column_data_column,
             file_handle_column,
@@ -493,6 +511,15 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
     int return_data = 0==strcmp(return_data_k->s, "true");
     LOG("dbnext return_data is %d\n", return_data);
 
+    K generate_key_k = dict_entry(dbstate, "generate_key");
+    { 
+        LOG("dbnext checking generate_key (%d)\n", generate_key_k->n);
+        int i=0;
+        for(i=0; i<generate_key_k->n; ++i) {
+            LOG("dbnext generate_key[%d] = %s\n", i, kS(generate_key_k)[i]);
+        }
+    }
+
     //K filename_column = dict_entry(dbstate, "filename");
     K file_handle_column = dict_entry(dbstate, "file_handle");
     K data_handle_column = dict_entry(dbstate, "data_handle");
@@ -511,34 +538,65 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
     char buffer[1024] = {0};
     int ok = 0;
     size_t size_t_ = 0;
+    char generate_key_buffer[8][1024];
+    generate_key_buffer[0][0] = '\0';
+    generate_key_buffer[1][0] = '\0';
+    generate_key_buffer[2][0] = '\0';
+    generate_key_buffer[3][0] = '\0';
+    generate_key_buffer[4][0] = '\0';
+    generate_key_buffer[5][0] = '\0';
+    generate_key_buffer[6][0] = '\0';
+    generate_key_buffer[7][0] = '\0';
+
+    int generate_key_column_pos[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
 
     int private_data_column_pos = -1;
-
-#ifndef DBOP_EI
-    int jind = 0;
-    unsigned char* b64 = 0;
-#endif
 
     EI(ei_x_new(&data->x));
     data->has_x = 1;
 
-#ifndef DBOP_EI
-    // Specify [2,[]] for rethink-compatible json array
-    jind += sprintf(json + jind, "[2,[");
-#endif
     int i=0;
     for(i=0; i < num_records; ++i) {
 
+        if (i != 0) {
+            fwrite("\n", 1, 1, outputfile_h);
+        }
+
         int j=0;
         for(j=0; j < column_name_column->n; ++j) {
-            LOG("dbnext data %s\n", kS(column_name_column)[j]);
+            const char* operating_column = kS(column_name_column)[j];
+            LOG("dbnext data (%d) %s\n", j, operating_column);
             ktype = kJ(column_type_column)[j];
             fptr = (FILE*)kJ(file_handle_column)[j];
 
             // HACK
             if(private_data_column_pos < 0 &&
-                    str_ends_with(kS(column_name_column)[j], "private_data_expiry_0")) {
+                    str_ends_with(operating_column, "private_data_expiry_0")) {
                 private_data_column_pos = j;
+            }
+
+            int this_column_generates_the_key = -1;
+            int z=0;
+            for(z=0; z < generate_key_k->n; ++z) {
+                // Detect the column positions that generate the key
+                if(generate_key_column_pos[z] < 0) {
+                    const char* compare_to = kS(generate_key_k)[z];
+                    LOG("dbnext %s <> %s\n", operating_column, compare_to);
+                    if(str_ends_with(operating_column, compare_to)) {
+                        LOG("dbnext %s is at j==%d, z==%d\n", compare_to, j, z);
+                        generate_key_column_pos[z] = j;
+                    } else if (str_starts_with(kS(generate_key_k)[z], "20")) {
+                        // HACK to support caller-forced key portions based on partition
+                        // rather than table column. e.g. `2019-08-01:blahblah:etc'
+                        generate_key_column_pos[z] = HARDCODED_KEY_GENERATION_MAGIC_NUMBER;
+                    }
+                }
+
+                // Detect if we're operating on a column that generates the key
+                if(generate_key_column_pos[z] == j) {
+                    this_column_generates_the_key = z;
+                    break;
+                }
             }
 
             switch (ktype) {
@@ -618,62 +676,110 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
             // WRITE DATA TO CSV
             if (outputfile_h != 0 && ok) {
-                if (j == 0) {
-                    fwrite("\n", 1, 1, outputfile_h);
-                }
-
                 if (j != private_data_column_pos) {
                     switch (ktype) {
                         case KT: // time
                             fprintf_i(outputfile_h, int_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                            }
                             break;
                         case KV: // second
                             fprintf_i(outputfile_h, int_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                            }
                             break;
                         case KU: // minute
                             fprintf_i(outputfile_h, int_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                            }
                             break;
                         case KN: // timespan
                             fprintf_j(outputfile_h, long_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_j(&generate_key_buffer[this_column_generates_the_key][0], long_);
+                            }
                             break;
                         case KZ: // datetime
                             fprintf_z(outputfile_h, double_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_z(&generate_key_buffer[this_column_generates_the_key][0], double_);
+                            }
                             break;
                         case KD: // date
                             fprintf_i(outputfile_h, int_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                            }
                             break;
                         case KM: // month
                             fprintf_i(outputfile_h, int_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                            }
                             break;
                         case KI: // int
                             fprintf_i(outputfile_h, int_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                            }
                             break;
                         case KP: // timestamp
                             fprintf_p(outputfile_h, long_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_j(&generate_key_buffer[this_column_generates_the_key][0], long_);
+                            }
                             break;
                         case KJ: // long
                             fprintf_j(outputfile_h, long_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_j(&generate_key_buffer[this_column_generates_the_key][0], long_);
+                            }
                             break;
                         case KF: // float
                             fprintf_f(outputfile_h, double_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_f(&generate_key_buffer[this_column_generates_the_key][0], double_);
+                            }
                             break;
                         case KC: // char
                             fprintf(outputfile_h, "%c", char_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf(&generate_key_buffer[this_column_generates_the_key][0], "%c", char_);
+                            }
                             break;
                         case KE: // real
                             fprintf_f(outputfile_h, double_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_f(&generate_key_buffer[this_column_generates_the_key][0], double_);
+                            }
                             break;
                         case KH: // short
                             fprintf_i(outputfile_h, (int)short_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], (int)short_);
+                            }
                             break;
                         case KG: // byte
                             fprintf_i(outputfile_h, (int)char_);
+                            if(this_column_generates_the_key >= 0) {
+                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], (int)char_);
+                            }
                             break;
                         case KB: // boolean
                             if(char_) {
                                 fwrite("true", 1, 4, outputfile_h);
                             } else {
                                 fwrite("false", 1, 5, outputfile_h);
+                            }
+                            if(this_column_generates_the_key >= 0) {
+                                if(char_) {
+                                    sprintf(&generate_key_buffer[this_column_generates_the_key][0], "true");
+                                } else {
+                                    sprintf(&generate_key_buffer[this_column_generates_the_key][0], "false");
+                                }
                             }
                             break;
                         case KS: // symbol
@@ -682,11 +788,19 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                             if (int_ == 1024) {
                             } else {
                                 fprintf(outputfile_h, "%s", buffer);
+                                if(this_column_generates_the_key >= 0) {
+                                    sprintf(&generate_key_buffer[this_column_generates_the_key][0], "%s", buffer);
+                                }
                             }
                             break;
                         case 0: // enum'd symbol
                             if(int_ > 0 && int_ < sym->n) {
                                 fprintf(outputfile_h, "%s", kS(sym)[int_]);
+                                if(this_column_generates_the_key >= 0) {
+                                    LOG("dbnext key gen %s -> %d\n", kS(sym)[int_], this_column_generates_the_key);
+                                    sprintf(&generate_key_buffer[this_column_generates_the_key][0], "%s", kS(sym)[int_]);
+                                    LOG("dbnext sprintf done %d\n", this_column_generates_the_key);
+                                }
                             } else {
                             }
                             break;
@@ -699,6 +813,11 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                                 ok = 1;
                             } else {
                                 fwrite(string_, 1, long_-pos, outputfile_h);
+
+                                if(this_column_generates_the_key >= 0) {
+                                    snprintf(&generate_key_buffer[this_column_generates_the_key][0],
+                                            long_-pos, "%s", string_);
+                                }
                             }
                             genq_free(string_);
 
@@ -720,7 +839,6 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                 continue;
             }
 
-#ifdef DBOP_EI
             // WRITE DATA TO EI
             if(ok && j == 0) {
                 EI(ei_x_encode_list_header(&data->x, 1));
@@ -838,189 +956,41 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     EI(ei_x_encode_atom(&data->x, "null"));
                     break;
             }
-#else
-            // WRITE DATA TO JSON BUFF
-            if(ok && i == 0 && j == 0) {
-                jind += sprintf(json + jind, "{");
-            } else if (ok && i > 0 && j == 0) {
-                jind += sprintf(json + jind, ",{");
-            } else if(!ok && j == 0) {
-                break;
-            } else if(!ok) {
-                // We already started the output, can't back out now!
-                jind += sprintf(json + jind, "\"%s\":null", kS(column_name_column)[j]);
-                continue;
-            } else if (ok) {
-                jind += sprintf(json + jind, ",");
-            }
-
-            jind += sprintf(json + jind, "\"%s\":", kS(column_name_column)[j]);
-
-            // HACK
-            int is_reql_bin = 0;
-            if(j == private_data_column_pos) {
-                jind += sprintf(json + jind, "{\"$reql_type$\":\"BINARY\",\"data\":");
-                is_reql_bin = 1;
-            }
-
-            switch (ktype) {
-                case KT: // time
-                    jind += sprintf_i(json + jind, int_);
-                    break;
-                case KV: // second
-                    jind += sprintf_i(json + jind, int_);
-                    break;
-                case KU: // minute
-                    jind += sprintf_i(json + jind, int_);
-                    break;
-                case KN: // timespan
-                    jind += sprintf_j(json + jind, long_);
-                    break;
-                case KZ: // datetime
-                    jind += sprintf_z(json + jind, double_);
-                    break;
-                case KD: // date
-                    jind += sprintf_i(json + jind, int_);
-                    break;
-                case KM: // month
-                    jind += sprintf_i(json + jind, int_);
-                    break;
-                case KI: // int
-                    jind += sprintf_i(json + jind, int_);
-                    break;
-                case KP: // timestamp
-                    jind += sprintf_p(json + jind, long_);
-                    break;
-                case KJ: // long
-                    jind += sprintf_j(json + jind, long_);
-                    break;
-                case KF: // float
-                    jind += sprintf_f(json + jind, double_);
-                    break;
-                case KC: // char
-                    jind += sprintf(json + jind, "\"%c\"", char_);
-                    break;
-                case KE: // real
-                    jind += sprintf_f(json + jind, double_);
-                    break;
-                case KH: // short
-                    jind += sprintf_i(json + jind, (int)short_);
-                    break;
-                case KG: // byte
-                    jind += sprintf_i(json + jind, (int)char_);
-                    break;
-                case KB: // boolean
-                    if(char_) {
-                        jind += sprintf(json + jind, "true");
-                    } else {
-                        jind += sprintf(json + jind, "false");
-                    }
-                    break;
-                case KS: // symbol
-                    // This typically won't be used since syms in a splayed
-                    // table should have an enumeration file (sym)
-                    if (int_ == 1024) {
-                        jind += sprintf(json + jind, "null");
-                    } else {
-                        jind += sprintf(json + jind, "\"%s\"", buffer);
-                    }
-                    break;
-                case 0: // enum'd symbol
-                    if(int_ > 0 && int_ < sym->n) {
-                        jind += sprintf(json + jind, "\"%s\"", kS(sym)[int_]);
-                    } else {
-                        jind += sprintf(json + jind, "null");
-                    }
-                    break;
-                case 87: // special string type
-                    fptr = (FILE*)kJ(data_handle_column)[j];
-
-                    unsigned char* string_ = genq_alloc((sizeof(unsigned char))*(1+long_-pos));
-                    ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
-                    string_[long_-pos] = 0;
-                    size_t_ = long_-pos;
-
-                    if(ok && !is_reql_bin) {
-                        // We're going to be embedding this string in a json field,
-                        // so we need to escape any quotes marks. If this function
-                        // finds any, it will return a new string, and we'll replace
-                        // string_ with it. Otherwise, do nothing
-                        unsigned char* escaped = escape_quotes(string_, size_t_, &size_t_);
-                        if(escaped) {
-                            genq_free(string_);
-                            string_ = escaped;
-                        }
-                    }
-
-                    if(string_[size_t_-1] == '\\') {
-                        // A string ending in a backslash will screw up our
-                        // json object. There are surely other cases that would
-                        // break us too, but this one is provided as a sanity
-                        // check.
-                        ok = 0;
-                    }
-
-                    if(!ok && is_reql_bin) {
-                        jind += sprintf(json + jind, "\"\"}");
-                        ok = 1;
-                    } else if(!ok) {
-                        jind += sprintf(json + jind, "null");
-                        ok = 1;
-                    } else if (is_reql_bin) {
-                        if(size_t_ > 0) {
-                            LOG("dbnext reql bin size %lld\n", size_t_);
-                            b64 = genq_base64_encode(string_, size_t_, &size_t_);
-                            if(b64) {
-                                jind += sprintf(json + jind, "\"%s\"}", b64);
-                            } else {
-                                jind += sprintf(json + jind, "\"\"}");
-                            }
-                            genq_free(b64);
-                        } else {
-                            jind += sprintf(json + jind, "\"\"}");
-                        }
-                    } else {
-                        jind += sprintf(json + jind, "\"%s\"", string_);
-                    }
-                    genq_free(string_);
-
-                    kJ(file_pos_column)[j] = long_;
-
-                    break;
-                default:
-                    LOG("dbnext unhandled type in json path %d\n", ktype);
-                    break;
-            }
-#endif
         }
-#ifndef DBOP_EI
-        if(ok) {
-            jind += sprintf(json + jind, "}");
-        } else {
+
+        if(!ok) {
             break;
         }
 
-        if(jind >= jind_escape_hatch) {
-            break;
+        // Row is finished. Check for key generation
+        if(generate_key_k->n > 0) {
+            int z=0;
+            for(z=0; z < generate_key_k->n; ++z) {
+                char* key_segment = 0;
+                if(generate_key_column_pos[z] == HARDCODED_KEY_GENERATION_MAGIC_NUMBER) {
+                    key_segment = kS(generate_key_k)[z];
+                } else {
+                    key_segment = &generate_key_buffer[z][0];
+                }
+                if(z == 0) {
+                    fprintf(outputfile_h, ",%s", key_segment);
+                } else {
+                    fprintf(outputfile_h, ":%s", key_segment);
+                }
+            }
+
+            // Reset the buffer
+            for(z=0; z < 8; ++z) {
+                generate_key_buffer[z][0] = '\0';
+            }
         }
-#endif
     }
 
-#ifdef DBOP_EI
     if(return_data) {
         EI(ei_x_encode_empty_list(&data->x));
     } else {
         EI(ei_x_encode_long(&data->x, i));
     }
-#else
-    if(return_data) {
-        jind += sprintf(json + jind, "]]");
-
-        EI(ei_x_encode_binary(&data->x, json, jind));
-    } else {
-        EI(ei_x_encode_long(&data->x, i));
-    }
-#endif
 
     return 0;
 }

@@ -272,6 +272,7 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
             OutputfileAppend = proplists:get_value(outputfile_append, Opts, false),
             CsvHeader = proplists:get_value(csv_header, Opts, true),
             ReturnData = proplists:get_value(return_data, Opts, true),
+            GenerateKey = proplists:get_value(generate_key, Opts, []),
 
             InputMeta = {dict, {list, symbol},
                                {list, [
@@ -279,6 +280,7 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
                                        symbol, % outputfile_append
                                        symbol, % csv_header
                                        symbol, % return_data
+                                       {list, symbol}, % GenerateKey
                                        {list, symbol}, % FilenameC
                                        {list, symbol}, % ColumnDataC
                                        {list, long}, % FileHandleC
@@ -291,6 +293,7 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
                              outputfile_append,
                              csv_header,
                              return_data,
+                             generate_key,
                              filename,
                              column_data,
                              file_handle,
@@ -303,6 +306,7 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
                              OutputfileAppend,
                              CsvHeader,
                              ReturnData,
+                             GenerateKey,
                              FilenameC,
                              ColumnDataC,
                              FileHandleC,
