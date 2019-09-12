@@ -333,7 +333,6 @@ void q_dbinit(QWorkDbOp *data, QOpts *opts) {
     }
         
     K symdata = db_read_sym_file(input->s);
-    r1(symdata);
     LOG("dbinit found symdata with %d symbols\n", symdata->n);
     data->handle = (unsigned long long)symdata;
     LOG("dbinit sym handle is %lld\n", data->handle);
@@ -412,6 +411,7 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     unsigned long long sym_handle = (unsigned long long)dict_entry(input, "symfile_cache")->j;
     LOG("dbopen looking for symdata with handle %lld\n", sym_handle);
     K symdata = (K)sym_handle;
+    r1(symdata);
     LOG("dbopen working with symdata with %d symbols\n", symdata->n);
     int ktype = 0;
     int i = 0;
