@@ -17,7 +17,11 @@
 
 -export([state/0, state/1]).
 
--export([dbopen/4, dbopen/5, dbnext/2, dbnext/3, dbclose/1, dbclose/2]).
+-export([dbinit/1, dbinit/2,
+         dbdeinit/0, dbdeinit/1,
+         dbopen/4, dbopen/5,
+         dbnext/2, dbnext/3,
+         dbclose/1, dbclose/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -38,12 +42,14 @@
 -define(FuncQDbOpen, 6).
 -define(FuncQDbNext, 7).
 -define(FuncQDbClose, 8).
+-define(FuncQDbInit, 9).
+-define(FuncQDbDeinit, 10).
 
 -define(PortTimeout, 600000).
 
 -include("../include/gen_q.hrl").
 
--record(state, {port, port_timeout, tid_start, tid_end, task_count=0}).
+-record(state, {port, port_timeout, tid_start, tid_end, task_count=0, symfile_cache}).
 
 start() ->
     start([]).
@@ -184,6 +190,14 @@ eval(SvrRef, Handle, Expr) ->
 eval(SvrRef, Handle, Expr, Timeout) ->
     apply(SvrRef, Handle, Expr, ok, ok, Timeout).
 
+dbinit(Db) -> dbinit(?MODULE, Db).
+dbinit(SvrRef, Db) ->
+    gen_server:call(SvrRef, {dbinit, Db, []}, infinity).
+
+dbdeinit() -> dbdeinit(?MODULE).
+dbdeinit(SvrRef) ->
+    gen_server:call(SvrRef, {dbdeinit, []}, infinity).
+
 dbopen(Db, Part, Table, Opts) -> dbopen(?MODULE, Db, Part, Table, Opts).
 dbopen(SvrRef, Db, Part, Table, Opts) ->
     gen_server:call(SvrRef, {dbopen, Db, Part, Table, Opts}, infinity).
@@ -235,7 +249,25 @@ handle_call({decode_binary, Binary}, _From, State) ->
     do_call(State, {?FuncQDecodeBinary, [Binary]});
 handle_call({apply, Handle, Func, Types, Values}, _From, State) ->
     do_call(State, {?FuncQApply, [Handle, Func, {Types, Values}]});
-handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
+handle_call({dbinit, Db, _Opts}, _From, State=#state{symfile_cache=undefined}) ->
+    SymFile = filename:join([Db, sym]),
+    case do_call(State, {?FuncQDbInit, [0, {symbol, list_to_atom(SymFile)}]}) of
+        {reply, {ok, SymfileCache, {symbol, ok}}, State2} ->
+            {reply, ok, State2#state{symfile_cache=SymfileCache}};
+        Error ->
+            Error
+    end;
+handle_call({dbinit, _Db, _Opts}, _From, State) ->
+    %% assume same db passed in
+    {reply, ok, State};
+handle_call({dbdeinit, _Opts}, _From, State=#state{symfile_cache=SymfileCache}) when SymfileCache =/= undefined ->
+    case do_call(State, {?FuncQDbDeinit, [SymfileCache, {long, 0}]}) of
+        {reply, {ok, _, {symbol, ok}}, State2} ->
+            {reply, ok, State2#state{symfile_cache=undefined}};
+        Error ->
+            Error
+    end;
+handle_call({dbopen, Db, Part, Table, Opts}, _From, State=#state{symfile_cache=SymfileCache}) when SymfileCache =/= undefined ->
     DbPartPath = filename:join([Db, Part, Table]),
     case file:list_dir(DbPartPath) of
         {ok, Columns0} ->
@@ -256,11 +288,12 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
             % Find remaining columns with easy types
             TypedColumns = (Columns -- StringDataColumns) -- StringOffsetColumns,
 
-            SymFile = filename:join([Db, sym]),
-
             FilenameC = [list_to_atom(filename:join([DbPartPath,X])) || X <- TypedColumns ++ StringOffsetColumns],
+
+            % for the supplemental data columns, if the column is uniquely type, we use a placeholder "/sym". 
+            % The logic in the native layer checks for this.
             ColumnDataC = [list_to_atom(X) || X <- (lists:duplicate(length(TypedColumns),
-                                               SymFile) ++
+                                               "/sym") ++
                                [ filename:join([DbPartPath, X]) || X <- StringDataColumns])],
             ColumnNameC = [list_to_atom(X) || X <- TypedColumns ++ StringOffsetColumns],
             FileHandleC = lists:duplicate(length(FilenameC), -1),
@@ -287,7 +320,8 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
                                        {list, long}, % DataHandleC
                                        {list, long}, % ColumnTypeC
                                        {list, long}, % FilePosC
-                                       {list, symbol} % ColumnNameC
+                                       {list, symbol}, % ColumnNameC
+                                       long
                                       ]}},
             InputContent = {[outputfile,
                              outputfile_append,
@@ -300,7 +334,8 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
                              data_handle,
                              column_type,
                              file_pos,
-                             column_name
+                             column_name,
+                             symfile_cache
                             ],
                             [Outputfile,
                              OutputfileAppend,
@@ -313,7 +348,8 @@ handle_call({dbopen, Db, Part, Table, Opts}, _From, State) ->
                              DataHandleC,
                              ColumnTypeC,
                              FilePosC,
-                             ColumnNameC
+                             ColumnNameC,
+                             SymfileCache
                             ]},
 
             DbState = {InputMeta, InputContent},
@@ -366,8 +402,11 @@ handle_info({'EXIT', _Pid, Reason}, State) ->
 
 terminate({port_terminated, _Reason}, _State) ->
     ok;
-terminate(_Reason, _State=#state{port=Port}) ->
-    port_close(Port).
+terminate(_Reason, _State=#state{port=Port, symfile_cache=undefined}) ->
+    port_close(Port);
+terminate(_Reason, State=#state{symfile_cache=SymfileCache}) ->
+    catch(do_call(State, {?FuncQDbDeinit, [0, {long, SymfileCache}]})),
+    terminate(_Reason, State#state{symfile_cache=undefined}).
 
 handle_cast(_Msg, State) ->
     {noreply, State}.

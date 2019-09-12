@@ -59,8 +59,6 @@ unsigned char * genq_base64_encode(const unsigned char *src, size_t len, size_t 
 
 unsigned char * escape_quotes(const unsigned char *src, size_t len, size_t *out_len);
 
-K global_sym = 0;
-
 #define HANDLE_K_ERRNO(cleanup)                                       \
     LOG("checking errno %d\n", 0);                                    \
     if(errno) {                                                       \
@@ -320,6 +318,50 @@ K db_read_sym_file(const char* sym_file) {
     return 0;
 }
 
+void q_dbinit(QWorkDbOp *data, QOpts *opts) {
+    K input;
+    int ei_res = ei_decode_k(data->buff, &data->types_index,
+            &data->values_index, &input, opts);
+    if(ei_res < 0) {
+        HANDLE_ERROR("ei_decode_k", 11);
+        return;
+    }
+
+    if(input->t != -KS) {
+        HANDLE_ERROR("ei_decode_k", 11);
+        return;
+    }
+        
+    K symdata = db_read_sym_file(input->s);
+    r1(symdata);
+    LOG("dbinit found symdata with %d symbols\n", symdata->n);
+    data->handle = (unsigned long long)symdata;
+    LOG("dbinit sym handle is %lld\n", data->handle);
+
+    K r = ks(ss("ok"));
+    int result = ei_x_encode_dbop_result(data, r, opts);
+    r0(r);
+    if(result < 0) {
+        HANDLE_ERROR("eix", 3);
+        return;
+    }
+}
+
+void q_dbdeinit(QWorkDbOp *data, QOpts *opts) {
+    K symdata = (K)data->n;
+
+    // This should delete the data from memory
+    kx_guarded_decr_ref(symdata);
+
+    K r = ks(ss("ok"));
+    int result = ei_x_encode_dbop_result(data, r, opts);
+    r0(r);
+    if(result < 0) {
+        HANDLE_ERROR("eix", 3);
+        return;
+    }
+}
+
 void q_dbopen(QWorkDbOp* data, QOpts* opts){
     LOG("dbopen %d\n", 0);
 
@@ -356,9 +398,8 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
 
     // The following block examines all files in the input table:
     //   1. Opens a file handle to each
-    //   2. For the sym file, loads it into memory in its entirety
-    //   3. Discovers the k-type of each file
-    //   4. Initializes the file pos for each file so that reading data
+    //   2. Discovers the k-type of each file
+    //   3. Initializes the file pos for each file so that reading data
     //      can follow.
     FILE *fptr;
     K filename_column = dict_entry(input, "filename");
@@ -368,10 +409,11 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     K column_type_column = dict_entry(input, "column_type");
     K file_pos_column = dict_entry(input, "file_pos");
     K column_name_column = dict_entry(input, "column_name");
-    K symdata = global_sym;
-    if(global_sym !=0) {
-        r1(global_sym);
-    }
+
+    unsigned long long sym_handle = (unsigned long long)dict_entry(input, "symfile_cache")->j;
+    LOG("dbopen looking for symdata with handle %lld\n", sym_handle);
+    K symdata = (K)sym_handle;
+    LOG("dbopen working with symdata with %d symbols\n", symdata->n);
     int ktype = 0;
     int i = 0;
     for(i=0; i<filename_column->n; ++i) {
@@ -403,15 +445,6 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
         // Open data file
         const char* data_col_file = kS(column_data_column)[i];
         if(str_ends_with(data_col_file, "/sym")) {
-            if(symdata == 0) {
-                symdata = db_read_sym_file(data_col_file);
-                if(symdata == 0) {
-                    HANDLE_ERROR("sym", 3);
-                    return;
-                }
-                global_sym = symdata;
-                r1(global_sym);
-            }
             // Magic number (-11) to signify that this sym data is held in
             // memory in the dbstate
             kJ(data_handle_column)[i] = -KS;
@@ -499,10 +532,16 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
         return -1;
     }
     K sym = dict_entry(dbstate, "sym");
-    if(sym == 0) {
+    if(sym == 0 || sym->n == 0) {
         LOG("dbnext ERROR sym %d\n", 0);
         HANDLE_ERROR("sym", 3);
         return -1;
+    }
+    LOG("dbnext checking sym %d\n", sym->n);
+    int ii=0;
+    for(ii=0; ii<4; ++ii) {
+        if(sym->n > ii)
+            LOG("dbnext sym %s\n", kS(sym)[ii]);
     }
     K outputfile_k = dict_entry(dbstate, "outputfile");
     FILE *outputfile_h = (FILE*)outputfile_k->j;

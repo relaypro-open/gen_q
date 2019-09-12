@@ -135,6 +135,10 @@ int decode_op(char *buff, int* index, QWork *work) {
             return decode_op_dbop(buff, index, work);
         case FUNC_Q_DBCLOSE:
             return decode_op_dbop(buff, index, work);
+        case FUNC_Q_DBINIT:
+            return decode_op_dbop(buff, index, work);
+        case FUNC_Q_DBDEINIT:
+            return decode_op_dbop(buff, index, work);
     }
     return -1;
 }
@@ -463,6 +467,10 @@ void genq_work(void *w) {
         case FUNC_Q_DBCLOSE:
             q_dbclose((QWorkDbOp*)work->data, work->opts);
             break;
+        case FUNC_Q_DBINIT:
+            q_dbinit((QWorkDbOp*)work->data, work->opts);
+        case FUNC_Q_DBDEINIT:
+            q_dbdeinit((QWorkDbOp*)work->data, work->opts);
     }
 }
 
@@ -510,6 +518,10 @@ int genq_work_result(void *w, ei_x_buff *buff) {
         case FUNC_Q_DBNEXT:
             return work_result_dbop((QWorkDbOp*)work->data, buff);
         case FUNC_Q_DBCLOSE:
+            return work_result_dbop((QWorkDbOp*)work->data, buff);
+        case FUNC_Q_DBINIT:
+            return work_result_dbop((QWorkDbOp*)work->data, buff);
+        case FUNC_Q_DBDEINIT:
             return work_result_dbop((QWorkDbOp*)work->data, buff);
     }
     return -1;
@@ -633,7 +645,14 @@ void free_qwork_data(int op, void *data) {
             LOG("free qwork dbclose %d\n", 0);
             free_qwork_dbop((QWorkDbOp*)data);
             break;
-
+        case FUNC_Q_DBINIT:
+            LOG("free qwork dbinit %d\n", 0);
+            free_qwork_dbop((QWorkDbOp*)data);
+            break;
+        case FUNC_Q_DBDEINIT:
+            LOG("free qwork dbdeinit %d\n", 0);
+            free_qwork_dbop((QWorkDbOp*)data);
+            break;
     }
 }
 

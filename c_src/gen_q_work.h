@@ -14,6 +14,8 @@
 #define FUNC_Q_DBOPEN 6
 #define FUNC_Q_DBNEXT 7
 #define FUNC_Q_DBCLOSE 8
+#define FUNC_Q_DBINIT 9
+#define FUNC_Q_DBDEINIT 10
 
 typedef struct {
     int unix_timestamp_is_q_datetime;

@@ -11,6 +11,8 @@ extern void q_decodebinary(QWorkDecodeBinary* data, QOpts* opts);
 extern void q_dbopen(QWorkDbOp* data, QOpts* opts);
 extern void q_dbnext(QWorkDbOp* data, QOpts* opts);
 extern void q_dbclose(QWorkDbOp* data, QOpts* opts);
+extern void q_dbinit(QWorkDbOp* data, QOpts* opts);
+extern void q_dbdeinit(QWorkDbOp* data, QOpts* opts);
 
 #endif
 
