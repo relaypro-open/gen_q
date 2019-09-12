@@ -422,9 +422,9 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
         if (outputfile_h != 0 && csv_header) {
             fwrite(kS(column_name_column)[i], 1, strlen(kS(column_name_column)[i]), outputfile_h);
             if(i+1 != filename_column->n) {
-                fwrite(",", 1, 1, outputfile_h);
+                fwrite("|", 1, 1, outputfile_h);
             } else if(generate_key_list->n > 0) {
-                fwrite(",__key__", 1, 8, outputfile_h);
+                fwrite("|__key__", 1, 8, outputfile_h);
             }
 
             if(i+1 == filename_column->n) {
@@ -865,7 +865,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     }
                 }
                 if(j+1 != column_name_column->n) {
-                    fwrite(",", 1, 1, outputfile_h);
+                    fwrite("|", 1, 1, outputfile_h);
                 }
             }
 
@@ -1008,7 +1008,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     key_segment = &generate_key_buffer[z][0];
                 }
                 if(z == 0) {
-                    fprintf(outputfile_h, ",%s", key_segment);
+                    fprintf(outputfile_h, "|%s", key_segment);
                 } else {
                     fprintf(outputfile_h, ":%s", key_segment);
                 }
