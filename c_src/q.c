@@ -383,7 +383,6 @@ void q_dbopen(QWorkDbOp* data, QOpts* opts){
     if(0!=strcmp(outputfile->s, "undefined")) {
         if (outputfile_append) {
             outputfile_h = fopen(outputfile->s, "a+");
-            fwrite("\n", 1, 1, outputfile_h);
         } else {
             outputfile_h = fopen(outputfile->s, "w+");
         }
@@ -596,10 +595,6 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
     int i=0;
     for(i=0; i < num_records; ++i) {
-
-        if (i != 0) {
-            fwrite("\n", 1, 1, outputfile_h);
-        }
 
         int j=0;
         for(j=0; j < column_name_column->n; ++j) {
@@ -854,8 +849,9 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                                 fwrite(string_, 1, long_-pos, outputfile_h);
 
                                 if(this_column_generates_the_key >= 0) {
+                                    /* add 1 to len so that snprintf will write the nul in the right place */
                                     snprintf(&generate_key_buffer[this_column_generates_the_key][0],
-                                            long_-pos, "%s", string_);
+                                            1+long_-pos, "%s", string_);
                                 }
                             }
                             genq_free(string_);
@@ -1023,6 +1019,8 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                 generate_key_buffer[z][0] = '\0';
             }
         }
+
+        fwrite("\n", 1, 1, outputfile_h);
     }
 
     if(return_data) {
