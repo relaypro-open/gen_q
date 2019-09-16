@@ -537,11 +537,6 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
         return -1;
     }
     LOG("dbnext checking sym %d\n", sym->n);
-    int ii=0;
-    for(ii=0; ii<4; ++ii) {
-        if(sym->n > ii)
-            LOG("dbnext sym %s\n", kS(sym)[ii]);
-    }
     K outputfile_k = dict_entry(dbstate, "outputfile");
     FILE *outputfile_h = (FILE*)outputfile_k->j;
     K return_data_k = dict_entry(dbstate, "return_data");
@@ -550,15 +545,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
     LOG("dbnext return_data is %d\n", return_data);
 
     K generate_key_k = dict_entry(dbstate, "generate_key");
-    { 
-        LOG("dbnext checking generate_key (%d)\n", generate_key_k->n);
-        int i=0;
-        for(i=0; i<generate_key_k->n; ++i) {
-            LOG("dbnext generate_key[%d] = %s\n", i, kS(generate_key_k)[i]);
-        }
-    }
 
-    //K filename_column = dict_entry(dbstate, "filename");
     K file_handle_column = dict_entry(dbstate, "file_handle");
     K data_handle_column = dict_entry(dbstate, "data_handle");
     K column_type_column = dict_entry(dbstate, "column_type");
@@ -823,7 +810,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                             } else {
                                 fprintf(outputfile_h, "%s", buffer);
                                 if(this_column_generates_the_key >= 0) {
-                                    sprintf(&generate_key_buffer[this_column_generates_the_key][0], "%s", buffer);
+                                    snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "%s", buffer);
                                 }
                             }
                             break;
@@ -832,31 +819,37 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                                 fprintf(outputfile_h, "%s", kS(sym)[int_]);
                                 if(this_column_generates_the_key >= 0) {
                                     LOG("dbnext key gen %s -> %d\n", kS(sym)[int_], this_column_generates_the_key);
-                                    sprintf(&generate_key_buffer[this_column_generates_the_key][0], "%s", kS(sym)[int_]);
+                                    snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "%s", kS(sym)[int_]);
                                     LOG("dbnext sprintf done %d\n", this_column_generates_the_key);
                                 }
                             } else {
                             }
                             break;
                         case 87: // special string type
-                            fptr = (FILE*)kJ(data_handle_column)[j];
+                            {
+                                fptr = (FILE*)kJ(data_handle_column)[j];
 
-                            char* string_ = genq_alloc((sizeof(char))*(long_-pos));
-                            ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
-                            if(!ok) {
-                                ok = 1;
-                            } else {
-                                fwrite(string_, 1, long_-pos, outputfile_h);
+                                char* string_ = genq_alloc((sizeof(char))*(long_-pos));
+                                ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
+                                if(!ok) {
+                                    ok = 1;
+                                } else {
+                                    fwrite(string_, 1, long_-pos, outputfile_h);
 
-                                if(this_column_generates_the_key >= 0) {
-                                    /* add 1 to len so that snprintf will write the nul in the right place */
-                                    snprintf(&generate_key_buffer[this_column_generates_the_key][0],
-                                            1+long_-pos, "%s", string_);
+                                    if(this_column_generates_the_key >= 0) {
+                                        /* add 1 to len so that snprintf will write the nul in the right place */
+                                        int max = 1024;
+                                        if(1+long_-pos < max) {
+                                            max = 1+long_-pos;
+                                        }
+                                        snprintf(&generate_key_buffer[this_column_generates_the_key][0],
+                                                max, "%s", string_);
+                                    }
                                 }
-                            }
-                            genq_free(string_);
+                                genq_free(string_);
 
-                            kJ(file_pos_column)[j] = long_;
+                                kJ(file_pos_column)[j] = long_;
+                            }
 
                             break;
                         default:
