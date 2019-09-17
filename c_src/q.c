@@ -688,6 +688,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     pos = kJ(file_pos_column)[j];
                     LOG("dbnext string pos %ld\n", pos);
                     ok = 1 == fread((void*)&long_, 8, 1, fptr);
+                    LOG("dbnext string long %lld\n", long_);
 
                     break;
                 default:
