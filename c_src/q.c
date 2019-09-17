@@ -50,11 +50,11 @@ void fprintf_f(FILE *fptr, double d);
 void fprintf_z(FILE *fptr, double d);
 void fprintf_p(FILE *fptr, long long j);
 
-int sprintf_i(char *buf, int i);
-int sprintf_j(char *buf, long long j);
-int sprintf_f(char *buf, double d);
-int sprintf_z(char *buf, double d);
-int sprintf_p(char *buf, long long j);
+int snprintf_i(char *buf, int n, int i);
+int snprintf_j(char *buf, int n, long long j);
+int snprintf_f(char *buf, int n, double d);
+int snprintf_z(char *buf, int n, double d);
+int snprintf_p(char *buf, int n, long long j);
 unsigned char * genq_base64_encode(const unsigned char *src, size_t len, size_t *out_len);
 
 unsigned char * escape_quotes(const unsigned char *src, size_t len, size_t *out_len);
@@ -702,91 +702,91 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                         case KT: // time
                             fprintf_i(outputfile_h, int_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                                snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KV: // second
                             fprintf_i(outputfile_h, int_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                                snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KU: // minute
                             fprintf_i(outputfile_h, int_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                                snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KN: // timespan
                             fprintf_j(outputfile_h, long_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_j(&generate_key_buffer[this_column_generates_the_key][0], long_);
+                                snprintf_j(&generate_key_buffer[this_column_generates_the_key][0], 1024, long_);
                             }
                             break;
                         case KZ: // datetime
                             fprintf_z(outputfile_h, double_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_z(&generate_key_buffer[this_column_generates_the_key][0], double_);
+                                snprintf_z(&generate_key_buffer[this_column_generates_the_key][0], 1024, double_);
                             }
                             break;
                         case KD: // date
                             fprintf_i(outputfile_h, int_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                                snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KM: // month
                             fprintf_i(outputfile_h, int_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                                snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KI: // int
                             fprintf_i(outputfile_h, int_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], int_);
+                                snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KP: // timestamp
                             fprintf_p(outputfile_h, long_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_j(&generate_key_buffer[this_column_generates_the_key][0], long_);
+                                snprintf_j(&generate_key_buffer[this_column_generates_the_key][0], 1024, long_);
                             }
                             break;
                         case KJ: // long
                             fprintf_j(outputfile_h, long_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_j(&generate_key_buffer[this_column_generates_the_key][0], long_);
+                                snprintf_j(&generate_key_buffer[this_column_generates_the_key][0], 1024, long_);
                             }
                             break;
                         case KF: // float
                             fprintf_f(outputfile_h, double_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_f(&generate_key_buffer[this_column_generates_the_key][0], double_);
+                                snprintf_f(&generate_key_buffer[this_column_generates_the_key][0], 1024, double_);
                             }
                             break;
                         case KC: // char
                             fprintf(outputfile_h, "%c", char_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf(&generate_key_buffer[this_column_generates_the_key][0], "%c", char_);
+                                snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "%c", char_);
                             }
                             break;
                         case KE: // real
                             fprintf_f(outputfile_h, double_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_f(&generate_key_buffer[this_column_generates_the_key][0], double_);
+                                snprintf_f(&generate_key_buffer[this_column_generates_the_key][0], 1024, double_);
                             }
                             break;
                         case KH: // short
                             fprintf_i(outputfile_h, (int)short_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], (int)short_);
+                                snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, (int)short_);
                             }
                             break;
                         case KG: // byte
                             fprintf_i(outputfile_h, (int)char_);
                             if(this_column_generates_the_key >= 0) {
-                                sprintf_i(&generate_key_buffer[this_column_generates_the_key][0], (int)char_);
+                                snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, (int)char_);
                             }
                             break;
                         case KB: // boolean
@@ -797,9 +797,9 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                             }
                             if(this_column_generates_the_key >= 0) {
                                 if(char_) {
-                                    sprintf(&generate_key_buffer[this_column_generates_the_key][0], "true");
+                                    snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "true");
                                 } else {
-                                    sprintf(&generate_key_buffer[this_column_generates_the_key][0], "false");
+                                    snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "false");
                                 }
                             }
                             break;
@@ -820,7 +820,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                                 if(this_column_generates_the_key >= 0) {
                                     LOG("dbnext key gen %s -> %d\n", kS(sym)[int_], this_column_generates_the_key);
                                     snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "%s", kS(sym)[int_]);
-                                    LOG("dbnext sprintf done %d\n", this_column_generates_the_key);
+                                    LOG("dbnext snprintf done %d\n", this_column_generates_the_key);
                                 }
                             } else {
                             }
@@ -829,25 +829,34 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                             {
                                 fptr = (FILE*)kJ(data_handle_column)[j];
 
-                                char* string_ = genq_alloc((sizeof(char))*(long_-pos));
-                                ok = (long_-pos) == fread(string_, 1, long_-pos, fptr);
-                                if(!ok) {
-                                    ok = 1;
-                                } else {
-                                    fwrite(string_, 1, long_-pos, outputfile_h);
-
+                                int size = long_-pos;
+                                if(size < 0 || size > 8000) {
                                     if(this_column_generates_the_key >= 0) {
-                                        /* add 1 to len so that snprintf will write the nul in the right place */
                                         int max = 1024;
-                                        if(1+long_-pos < max) {
-                                            max = 1+long_-pos;
-                                        }
                                         snprintf(&generate_key_buffer[this_column_generates_the_key][0],
-                                                max, "%s", string_);
+                                                max, "error");
                                     }
-                                }
-                                genq_free(string_);
+                                } else {
+                                    char* string_ = genq_alloc((sizeof(char))*(size));
+                                    ok = size == fread(string_, 1, size, fptr);
+                                    if(!ok) {
+                                        ok = 1;
+                                    } else {
+                                        fwrite(string_, 1, size, outputfile_h);
 
+                                        if(this_column_generates_the_key >= 0) {
+                                            /* add 1 to len so that snprintf will write the nul in the right place */
+                                            int max = 1024;
+                                            if(1+size < max) {
+                                                max = 1+size;
+                                            }
+                                            snprintf(&generate_key_buffer[this_column_generates_the_key][0],
+                                                    max, "%s", string_);
+                                        }
+                                    }
+                                    genq_free(string_);
+
+                                }
                                 kJ(file_pos_column)[j] = long_;
                             }
 
@@ -1033,12 +1042,12 @@ void fprintf_i(FILE *fptr, int i) {
     fprintf(fptr, "%d", i);
 }
 
-int sprintf_i(char *buf, int i) {
+int snprintf_i(char *buf, int n, int i) {
     if (i == ni ||
             i == wi) {
-        return sprintf(buf, "null");
+        return snprintf(buf, n, "null");
     }
-    return sprintf(buf, "%d", i);
+    return snprintf(buf, n, "%d", i);
 }
 
 void fprintf_j(FILE *fptr, long long j) {
@@ -1049,12 +1058,12 @@ void fprintf_j(FILE *fptr, long long j) {
     fprintf(fptr, "%lld", j);
 }
 
-int sprintf_j(char *buf, long long j) {
+int snprintf_j(char *buf, int n, long long j) {
     if (j == nj ||
             j == wj) {
-        return sprintf(buf, "null");
+        return snprintf(buf, n, "null");
     }
-    return sprintf(buf, "%lld", j);
+    return snprintf(buf, n, "%lld", j);
 }
 
 void fprintf_f(FILE *fptr, double d) {
@@ -1064,11 +1073,11 @@ void fprintf_f(FILE *fptr, double d) {
     fprintf(fptr, "%f", d);
 }
 
-int sprintf_f(char *buf, double d) {
+int snprintf_f(char *buf, int n, double d) {
     if(d == nh || d == wh || d!=d) {
-        return sprintf(buf, "null");
+        return snprintf(buf, n, "null");
     }
-    return sprintf(buf, "%f", d);
+    return snprintf(buf, n, "%f", d);
 }
 
 void fprintf_z(FILE *fptr, double d) {
@@ -1077,11 +1086,10 @@ void fprintf_z(FILE *fptr, double d) {
     fprintf_j(fptr, unix_micros);
 }
 
-int sprintf_z(char *buf, double d) {
-    if(d == nf || d == wf || d != d) return sprintf(buf, "null");
+int snprintf_z(char *buf, int n, double d) {
+    if(d == nf || d == wf || d != d) return snprintf(buf, n, "null");
     long long unix_micros = datetime_to_unix_micros(d);
-    return sprintf(buf, "{\"$reql_type$\":\"TIME\",\"epoch_time\":%f,\"timezone\":\"+00:00\"}",
-            ((double)unix_micros) / (1000.0*1000.0));
+    return snprintf(buf, n, "%lld", unix_micros);
 }
 
 void fprintf_p(FILE *fptr, long long j) {
@@ -1090,11 +1098,10 @@ void fprintf_p(FILE *fptr, long long j) {
     fprintf_j(fptr, unix_micros);
 }
 
-int sprintf_p(char *buf, long long j) {
-    if(j == nj || j == wj) return sprintf(buf, "null");
+int snprintf_p(char *buf, int n, long long j) {
+    if(j == nj || j == wj) return snprintf(buf, n, "null");
     long long unix_micros = timestamp_to_unix_micros(j);
-    return sprintf(buf, "{\"$reql_type$\":\"TIME\",\"epoch_time\":%f,\"timezone\":\"+00:00\"}",
-            ((double)unix_micros) / (1000.0*1000.0));
+    return snprintf(buf, n, "%lld", unix_micros);
 }
 
 void q_dbclose(QWorkDbOp* data, QOpts* opts){
