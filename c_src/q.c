@@ -586,7 +586,6 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
         int j=0;
         for(j=0; j < column_name_column->n; ++j) {
             const char* operating_column = kS(column_name_column)[j];
-            LOG("dbnext data (%d) %s\n", j, operating_column);
             ktype = kJ(column_type_column)[j];
             fptr = (FILE*)kJ(file_handle_column)[j];
 
@@ -819,9 +818,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                             if(int_ > 0 && int_ < sym->n) {
                                 fprintf(outputfile_h, "%s", kS(sym)[int_]);
                                 if(this_column_generates_the_key >= 0) {
-                                    LOG("dbnext key gen %s -> %d\n", kS(sym)[int_], this_column_generates_the_key);
                                     snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "%s", kS(sym)[int_]);
-                                    LOG("dbnext snprintf done %d\n", this_column_generates_the_key);
                                 }
                             } else {
                             }
@@ -832,10 +829,9 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
 
                                 int size = long_-pos;
                                 if(size < 0 || size > 8000) {
+                                    LOG("dbnext string size is invalid %ld\n", size);
                                     if(this_column_generates_the_key >= 0) {
-                                        int max = 1024;
-                                        snprintf(&generate_key_buffer[this_column_generates_the_key][0],
-                                                max, "error");
+                                        snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "error");
                                     }
                                 } else {
                                     char* string_ = genq_alloc((sizeof(char))*(size));
