@@ -750,7 +750,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                         case KP: // timestamp
                             fprintf_p(outputfile_h, long_);
                             if(this_column_generates_the_key >= 0) {
-                                snprintf_j(&generate_key_buffer[this_column_generates_the_key][0], 1024, long_);
+                                snprintf_p(&generate_key_buffer[this_column_generates_the_key][0], 1024, long_);
                             }
                             break;
                         case KJ: // long
