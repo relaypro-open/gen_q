@@ -701,91 +701,91 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                     switch (ktype) {
                         case KT: // time
                             fprintf_i(outputfile_h, int_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KV: // second
                             fprintf_i(outputfile_h, int_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KU: // minute
                             fprintf_i(outputfile_h, int_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KN: // timespan
                             fprintf_j(outputfile_h, long_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_j(&generate_key_buffer[this_column_generates_the_key][0], 1024, long_);
                             }
                             break;
                         case KZ: // datetime
                             fprintf_z(outputfile_h, double_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_z(&generate_key_buffer[this_column_generates_the_key][0], 1024, double_);
                             }
                             break;
                         case KD: // date
                             fprintf_i(outputfile_h, int_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KM: // month
                             fprintf_i(outputfile_h, int_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KI: // int
                             fprintf_i(outputfile_h, int_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, int_);
                             }
                             break;
                         case KP: // timestamp
                             fprintf_p(outputfile_h, long_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_p(&generate_key_buffer[this_column_generates_the_key][0], 1024, long_);
                             }
                             break;
                         case KJ: // long
                             fprintf_j(outputfile_h, long_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_j(&generate_key_buffer[this_column_generates_the_key][0], 1024, long_);
                             }
                             break;
                         case KF: // float
                             fprintf_f(outputfile_h, double_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_f(&generate_key_buffer[this_column_generates_the_key][0], 1024, double_);
                             }
                             break;
                         case KC: // char
                             fprintf(outputfile_h, "%c", char_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "%c", char_);
                             }
                             break;
                         case KE: // real
                             fprintf_f(outputfile_h, double_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_f(&generate_key_buffer[this_column_generates_the_key][0], 1024, double_);
                             }
                             break;
                         case KH: // short
                             fprintf_i(outputfile_h, (int)short_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, (int)short_);
                             }
                             break;
                         case KG: // byte
                             fprintf_i(outputfile_h, (int)char_);
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 snprintf_i(&generate_key_buffer[this_column_generates_the_key][0], 1024, (int)char_);
                             }
                             break;
@@ -795,7 +795,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                             } else {
                                 fwrite("false", 1, 5, outputfile_h);
                             }
-                            if(this_column_generates_the_key >= 0) {
+                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                 if(char_) {
                                     snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "true");
                                 } else {
@@ -809,7 +809,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                             if (int_ == 1024) {
                             } else {
                                 fprintf(outputfile_h, "%s", buffer);
-                                if(this_column_generates_the_key >= 0) {
+                                if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                     snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "%s", buffer);
                                 }
                             }
@@ -817,7 +817,7 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                         case 0: // enum'd symbol
                             if(int_ > 0 && int_ < sym->n) {
                                 fprintf(outputfile_h, "%s", kS(sym)[int_]);
-                                if(this_column_generates_the_key >= 0) {
+                                if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                     snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "%s", kS(sym)[int_]);
                                 }
                             } else {
@@ -830,29 +830,35 @@ int ei_x_q_dbnext(QWorkDbOp* data, long num_records, QOpts* opts) {
                                 int size = long_-pos;
                                 if(size < 0 || size > 8000) {
                                     LOG("dbnext string size is invalid %ld\n", size);
-                                    if(this_column_generates_the_key >= 0) {
+                                    if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
                                         snprintf(&generate_key_buffer[this_column_generates_the_key][0], 1024, "error");
                                     }
                                 } else {
-                                    char* string_ = genq_alloc((sizeof(char))*(size));
-                                    ok = size == fread(string_, 1, size, fptr);
-                                    if(!ok) {
+                                    char* string_ = genq_alloc((sizeof(char))*(1+size));
+                                    if(string_ == 0) {
                                         ok = 1;
                                     } else {
-                                        fwrite(string_, 1, size, outputfile_h);
+                                        ok = size == fread(string_, 1, size, fptr);
+                                        if(!ok) {
+                                            ok = 1;
+                                        } else {
+                                            // snprintf requires string_ to follow C-string conventions, so
+                                            // we'll just be safe and always set the nul terminator.
+                                            string_[size] = '\0';
+                                            fwrite(string_, 1, size, outputfile_h);
 
-                                        if(this_column_generates_the_key >= 0) {
-                                            /* add 1 to len so that snprintf will write the nul in the right place */
-                                            int max = 1024;
-                                            if(1+size < max) {
-                                                max = 1+size;
+                                            if(this_column_generates_the_key >= 0 && this_column_generates_the_key < 8) {
+                                                /* add 1 to len so that snprintf will write the nul in the right place */
+                                                int max = 1024;
+                                                if(1+size < max) {
+                                                    max = 1+size;
+                                                }
+                                                snprintf(&generate_key_buffer[this_column_generates_the_key][0],
+                                                        max, "%s", string_);
                                             }
-                                            snprintf(&generate_key_buffer[this_column_generates_the_key][0],
-                                                    max, "%s", string_);
                                         }
+                                        genq_free(string_);
                                     }
-                                    genq_free(string_);
-
                                 }
                                 kJ(file_pos_column)[j] = long_;
                             }
